@@ -21,42 +21,47 @@ BottleManager::BottleManager() {
 }
 
 // Initialize bottle positions on the screen
+// Initialize bottle positions on the screen
 void BottleManager::initializeBottlePositions() {
-  // Set positions in a 3x3 grid
+  // Set positions in a 2-row grid (4 on top, 5 on bottom)
   int centerX = screenWidth / 2;
-  int centerY = screenHeight / 2 - 30; // Slightly higher than center
-  int spacingX = 180;
-  int spacingY = 130;
+  int upperY = screenHeight / 3; // First row at 1/3 of the screen
+  int lowerY = 2 * screenHeight / 3; // Second row at 2/3 of the screen
   
-  // Top row
-  bottlePositions[0].x = centerX - spacingX;
-  bottlePositions[0].y = centerY - spacingY;
+  // Spacing for top row (4 bottles)
+  int topSpacingX = 160;
   
-  bottlePositions[1].x = centerX;
-  bottlePositions[1].y = centerY - spacingY;
+  // Spacing for bottom row (5 bottles) - wider
+  int bottomSpacingX = 140;
   
-  bottlePositions[2].x = centerX + spacingX;
-  bottlePositions[2].y = centerY - spacingY;
+  // Top row - 4 bottles (positions 0, 1, 2, 3)
+  bottlePositions[0].x = centerX - (topSpacingX * 1.5);
+  bottlePositions[0].y = upperY;
   
-  // Middle row
-  bottlePositions[3].x = centerX - spacingX;
-  bottlePositions[3].y = centerY;
+  bottlePositions[1].x = centerX - (topSpacingX * 0.5);
+  bottlePositions[1].y = upperY;
   
-  bottlePositions[4].x = centerX;
-  bottlePositions[4].y = centerY;
+  bottlePositions[2].x = centerX + (topSpacingX * 0.5);
+  bottlePositions[2].y = upperY;
   
-  bottlePositions[5].x = centerX + spacingX;
-  bottlePositions[5].y = centerY;
+  bottlePositions[3].x = centerX + (topSpacingX * 1.5);
+  bottlePositions[3].y = upperY;
   
-  // Bottom row
-  bottlePositions[6].x = centerX - spacingX;
-  bottlePositions[6].y = centerY + spacingY;
+  // Bottom row - 5 bottles (positions 4, 5, 6, 7, 8)
+  bottlePositions[4].x = centerX - (bottomSpacingX * 2);
+  bottlePositions[4].y = lowerY;
   
-  bottlePositions[7].x = centerX;
-  bottlePositions[7].y = centerY + spacingY;
+  bottlePositions[5].x = centerX - bottomSpacingX;
+  bottlePositions[5].y = lowerY;
   
-  bottlePositions[8].x = centerX + spacingX;
-  bottlePositions[8].y = centerY + spacingY;
+  bottlePositions[6].x = centerX;
+  bottlePositions[6].y = lowerY;
+  
+  bottlePositions[7].x = centerX + bottomSpacingX;
+  bottlePositions[7].y = lowerY;
+  
+  bottlePositions[8].x = centerX + (bottomSpacingX * 2);
+  bottlePositions[8].y = lowerY;
 }
 
 // Get bottle data for a specific index

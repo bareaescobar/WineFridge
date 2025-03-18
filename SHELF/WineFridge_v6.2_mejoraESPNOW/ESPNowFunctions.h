@@ -10,7 +10,12 @@
 #include "BottleDatabase.h"
 #include "Config.h"
 
-// Estructura simplificada para pruebas
+// Added constants for reliable communication
+#define ESP_NOW_SEND_DELAY 150    // Delay between sends in ms
+#define ESP_NOW_MAX_RETRIES 3     // Maximum retry attempts
+#define ESP_NOW_RETRY_DELAY 50    // Base delay between retries (increases with each retry)
+
+// Message structures
 typedef struct simple_message {
   int messageType;     // 0: Menu, 1: Bottle DB, 2: Bottle Info, 3: Status, 4: Error
   char trayID[10];     // Identificador único para cada bandeja
@@ -52,11 +57,52 @@ struct_message wineData;
 
 // MAC Address of receiver ESP32 (7-inch display)
 uint8_t receiverMacAddress[] = {0x3C, 0x84, 0x27, 0xFF, 0x50, 0x98};
-// Alternativa: probar con orden inverso si no funciona
-// uint8_t receiverMacAddress[] = {0x98, 0x50, 0xFF, 0x27, 0x84, 0x3C};
+
+// Tracking variable for ESP-NOW success
+volatile bool lastSendSuccess = false;
 
 // Forward declarations
 void sendBottleInfoToDisplay(int bottleIndex);
+
+// New function to send data with retries
+bool sendESPNowData(const uint8_t* data, size_t size) {
+  bool success = false;
+  int attempts = 0;
+  
+  while (!success && attempts < ESP_NOW_MAX_RETRIES) {
+    lastSendSuccess = false; // Reset before sending
+    esp_err_t result = esp_now_send(receiverMacAddress, data, size);
+    
+    if (result == ESP_OK) {
+      // Wait a bit for the callback to set lastSendSuccess
+      unsigned long startTime = millis();
+      while (millis() - startTime < 50) {
+        delay(1); // Small delay to allow callback to set the status
+      }
+      
+      if (lastSendSuccess) {
+        success = true;
+      } else {
+        Serial.print("Transmission attempt ");
+        Serial.print(attempts + 1);
+        Serial.println(" - Callback reported failure");
+      }
+    } else {
+      Serial.print("Send error on attempt ");
+      Serial.print(attempts + 1);
+      Serial.print(": ");
+      Serial.println(result);
+    }
+    
+    if (!success) {
+      attempts++;
+      // Exponential backoff delay
+      delay(ESP_NOW_RETRY_DELAY * attempts);
+    }
+  }
+  
+  return success;
+}
 
 // Función de prueba para enviar un mensaje simple
 bool sendSimpleTestMessage() {
@@ -66,18 +112,21 @@ bool sendSimpleTestMessage() {
   strcpy(simpleData.text, "Test message from tray");
   simpleData.bottleCount = 0;
   
-  esp_err_t result = esp_now_send(receiverMacAddress, (uint8_t*)&simpleData, sizeof(simpleData));
-  if (result != ESP_OK) {
-    Serial.print("Error sending test message. Error code: ");
-    Serial.println(result);
-    return false;
+  bool success = sendESPNowData((uint8_t*)&simpleData, sizeof(simpleData));
+  if (success) {
+    Serial.println("Test message sent successfully");
+  } else {
+    Serial.println("Error sending test message after retries");
   }
-  Serial.println("Test message sent successfully");
-  return true;
+  
+  delay(ESP_NOW_SEND_DELAY); // Add delay after sending
+  return success;
 }
 
 // Callback function called when data is sent
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  lastSendSuccess = (status == ESP_NOW_SEND_SUCCESS);
+  
   char macStr[18];
   snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
           mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
@@ -170,18 +219,19 @@ void sendMenuToDisplay() {
   }
   simpleData.bottleCount = count;
   
-  // Send simple message via ESP-NOW
-  esp_err_t result = esp_now_send(receiverMacAddress, (uint8_t*)&simpleData, sizeof(simpleData));
+  // Send simple message via ESP-NOW with retry
+  bool success = sendESPNowData((uint8_t*)&simpleData, sizeof(simpleData));
   
-  if (result != ESP_OK) {
-    Serial.print("Error sending menu to display. Error code: ");
-    Serial.println(result);
-  } else {
+  if (success) {
     Serial.println("Menu sent to display");
+  } else {
+    Serial.println("Error sending menu to display after retries");
   }
+  
+  delay(ESP_NOW_SEND_DELAY); // Add delay after sending
 }
 
-// Send information about a specific bottle - updated detailed version
+// Send information about a specific bottle - updated for reliability
 void sendBottleInfoToDisplay(int bottleIndex) {
   if (bottleIndex < 0 || bottleIndex >= BOTTLE_COUNT) return;
   
@@ -203,21 +253,25 @@ void sendBottleInfoToDisplay(int bottleIndex) {
   bottleInfoMsg.weight = bottles[bottleIndex].weight;
   bottleInfoMsg.inFridge = bottles[bottleIndex].inFridge;
   
-  // Send bottle info message via ESP-NOW
-  esp_err_t result = esp_now_send(receiverMacAddress, (uint8_t*)&bottleInfoMsg, sizeof(bottleInfoMsg));
+  // Send bottle info message via ESP-NOW with retry
+  bool success = sendESPNowData((uint8_t*)&bottleInfoMsg, sizeof(bottleInfoMsg));
   
-  if (result != ESP_OK) {
-    Serial.print("Error sending bottle info to display. Error code: ");
-    Serial.println(result);
-  } else {
+  if (success) {
     Serial.print("Bottle info sent to display for bottle ");
     Serial.print(bottleIndex);
     Serial.print(": ");
     Serial.println(bottles[bottleIndex].name);
+  } else {
+    Serial.print("Error sending bottle info to display for bottle ");
+    Serial.print(bottleIndex);
+    Serial.print(": ");
+    Serial.println(bottles[bottleIndex].name);
   }
+  
+  delay(ESP_NOW_SEND_DELAY); // Add delay after sending
 }
 
-// Send the full bottle database to the display - updated version
+// Send the full bottle database to the display - updated for reliability
 void sendBottleDatabaseToDisplay() {
   // First, send the header information
   memset(&simpleData, 0, sizeof(simpleData));
@@ -236,30 +290,29 @@ void sendBottleDatabaseToDisplay() {
   }
   simpleData.bottleCount = count;
   
-  // Send simple message via ESP-NOW
-  esp_err_t result = esp_now_send(receiverMacAddress, (uint8_t*)&simpleData, sizeof(simpleData));
+  // Send simple message via ESP-NOW with retry
+  bool success = sendESPNowData((uint8_t*)&simpleData, sizeof(simpleData));
   
-  if (result != ESP_OK) {
-    Serial.print("Error sending bottle database header to display. Error code: ");
-    Serial.println(result);
+  if (!success) {
+    Serial.println("Error sending bottle database header to display after retries");
     return;
   }
   
   Serial.println("Bottle database header sent, now sending individual bottles...");
-  delay(50); // Small delay between messages
+  delay(ESP_NOW_SEND_DELAY); // Added larger delay between header and first bottle
   
   // Now send individual bottle information for each bottle one by one
   for (int i = 0; i < BOTTLE_COUNT; i++) {
     if (bottles[i].barcode != "") {  // Only send bottles with valid data
       sendBottleInfoToDisplay(i);
-      delay(50); // Small delay between each bottle to avoid packet loss
+      delay(ESP_NOW_SEND_DELAY); // Already has delay in sendBottleInfoToDisplay, but added here too for clarity
     }
   }
   
   Serial.println("All bottle information sent to display");
 }
 
-// Send a status update message - simplified version
+// Send a status update message - updated for reliability
 void sendStatusUpdateToDisplay(const char* message) {
   // Initialize simple message
   memset(&simpleData, 0, sizeof(simpleData));
@@ -278,18 +331,19 @@ void sendStatusUpdateToDisplay(const char* message) {
   }
   simpleData.bottleCount = count;
   
-  // Send simple message via ESP-NOW
-  esp_err_t result = esp_now_send(receiverMacAddress, (uint8_t*)&simpleData, sizeof(simpleData));
+  // Send simple message via ESP-NOW with retry
+  bool success = sendESPNowData((uint8_t*)&simpleData, sizeof(simpleData));
   
-  if (result != ESP_OK) {
-    Serial.print("Error sending status update to display. Error code: ");
-    Serial.println(result);
-  } else {
+  if (success) {
     Serial.println("Status update sent to display");
+  } else {
+    Serial.println("Error sending status update to display after retries");
   }
+  
+  delay(ESP_NOW_SEND_DELAY); // Add delay after sending
 }
 
-// Send an error message - simplified version
+// Send an error message - updated for reliability
 void sendErrorToDisplay(const char* errorMessage) {
   // Initialize simple message
   memset(&simpleData, 0, sizeof(simpleData));
@@ -299,15 +353,16 @@ void sendErrorToDisplay(const char* errorMessage) {
   // Copy the error message (truncated if needed)
   strncpy(simpleData.text, errorMessage, sizeof(simpleData.text) - 1);
   
-  // Send simple message via ESP-NOW
-  esp_err_t result = esp_now_send(receiverMacAddress, (uint8_t*)&simpleData, sizeof(simpleData));
+  // Send simple message via ESP-NOW with retry
+  bool success = sendESPNowData((uint8_t*)&simpleData, sizeof(simpleData));
   
-  if (result != ESP_OK) {
-    Serial.print("Error sending error message to display. Error code: ");
-    Serial.println(result);
-  } else {
+  if (success) {
     Serial.println("Error message sent to display");
+  } else {
+    Serial.println("Error sending error message to display after retries");
   }
+  
+  delay(ESP_NOW_SEND_DELAY); // Add delay after sending
 }
 
 #endif // ESP_NOW_FUNCTIONS_H

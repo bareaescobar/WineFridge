@@ -23,6 +23,13 @@ CommunicationManager::CommunicationManager() {
   memset(&incomingData, 0, sizeof(struct_message));
   memset(&simpleData, 0, sizeof(simple_message));
   memset(&bottleInfo, 0, sizeof(bottle_info_message));
+  
+  // Initialize buffer
+  for (int i = 0; i < MAX_BUFFER_SIZE; i++) {
+    messageBuffer[i].used = false;
+  }
+  bufferIndex = 0;
+  processingBuffer = false;
 }
 
 // Initialize ESP-NOW
@@ -48,8 +55,53 @@ bool CommunicationManager::initESPNow() {
 
 // Static callback function (to be registered with ESP-NOW)
 void CommunicationManager::staticOnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *incomingBuf, int len) {
-  // Call the instance method to process the data
-  commManager.processIncomingData(incomingBuf, len);
+  // Buffer the message for later processing to avoid blocking callback
+  commManager.bufferMessage(incomingBuf, len);
+}
+
+// Buffer the received message
+void CommunicationManager::bufferMessage(const uint8_t *data, size_t length) {
+  if (length > MAX_MESSAGE_SIZE) {
+    Serial.println("Message too large for buffer");
+    return;
+  }
+  
+  // Find a free buffer slot
+  int index = bufferIndex;
+  int attempts = 0;
+  
+  while (messageBuffer[index].used && attempts < MAX_BUFFER_SIZE) {
+    index = (index + 1) % MAX_BUFFER_SIZE;
+    attempts++;
+  }
+  
+  if (attempts >= MAX_BUFFER_SIZE) {
+    Serial.println("No free buffer slots available - message lost");
+    return;
+  }
+  
+  // Copy message to buffer
+  memcpy(messageBuffer[index].data, data, length);
+  messageBuffer[index].length = length;
+  messageBuffer[index].used = true;
+  
+  bufferIndex = (index + 1) % MAX_BUFFER_SIZE;
+}
+
+// Process any buffered messages
+void CommunicationManager::processBufferedMessages() {
+  if (processingBuffer) return; // Prevent reentrant calls
+  
+  processingBuffer = true;
+  
+  for (int i = 0; i < MAX_BUFFER_SIZE; i++) {
+    if (messageBuffer[i].used) {
+      processIncomingData(messageBuffer[i].data, messageBuffer[i].length);
+      messageBuffer[i].used = false;
+    }
+  }
+  
+  processingBuffer = false;
 }
 
 // Process incoming ESP-NOW data
@@ -95,6 +147,13 @@ void CommunicationManager::processIncomingData(const uint8_t *incomingBuf, int l
     
     // Update bottle data - No local extern declaration needed
     bottleManager.updateBottleFromMessage(bottleInfo);
+    
+    // Log this as an automatic update if appropriate
+    static unsigned long lastUserAction = 0;
+    unsigned long currentTime = millis();
+    if (currentTime - lastUserAction > 15000) { // If no user action in 15 seconds
+      Serial.println("Automatic update received");
+    }
     
     // Update display
     if (displayManager != NULL) {

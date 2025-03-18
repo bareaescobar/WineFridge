@@ -17,6 +17,14 @@ private:
   int selectedBottle;
   struct_message* incomingData; // Reference to received data
 
+  unsigned long lastUpdateTime;
+  String lastUpdateTimeString;
+  bool showingUpdateIndicator;
+  unsigned long updateIndicatorTimeout; // Timestamp when indicator should hide
+  
+  bool timeInitialized;  // Flag to indicate if time has been initialized
+  bool processingMessage; // Flag to indicate if we're processing a message
+
 public:
   DisplayManager(struct_message* data);
   
@@ -43,6 +51,25 @@ public:
   int getSelectedBottle() { return selectedBottle; }
   void setCurrentView(int view) { currentView = view; }
   void setSelectedBottle(int bottle) { selectedBottle = bottle; }
+
+  void updateLastUpdateTime();
+  void showUpdateIndicator();
+  void hideUpdateIndicator();
+  String getTimeString();
+  
+  // New time-related functions
+  void setTimeInitialized(bool initialized) { timeInitialized = initialized; }
+  bool isTimeInitialized() const { return timeInitialized; }
+  String getCurrentTime() const;
+  String getCurrentDate() const;
+  void updateTimeDisplay();
+  
+  // Processing state management
+  void setProcessingMessage(bool processing) { processingMessage = processing; }
+  bool isProcessingMessage() const { return processingMessage; }
+
+  bool isShowingUpdateIndicator() const { return showingUpdateIndicator; }
+  bool shouldHideUpdateIndicator() const { return showingUpdateIndicator && millis() > updateIndicatorTimeout; }
 };
 
 // Declare external instance for global use

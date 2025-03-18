@@ -8,6 +8,7 @@
 #include "config.h"
 #include "BottleManager.h"
 #include <WiFi.h>  // Add WiFi.h include here
+#include <time.h>  // Add time.h for time functions
 
 // Reference to external bottleManager object
 extern BottleManager bottleManager;
@@ -17,7 +18,109 @@ DisplayManager::DisplayManager(struct_message* data) {
   incomingData = data;
   currentView = VIEW_MAIN;
   selectedBottle = -1;
+  lastUpdateTime = 0;
+  lastUpdateTimeString = "";
+  showingUpdateIndicator = false;
+  timeInitialized = false;
+  processingMessage = false;
 }
+
+void DisplayManager::updateLastUpdateTime() {
+  lastUpdateTime = millis();
+  lastUpdateTimeString = getTimeString();
+  
+  // Show update indicator
+  showUpdateIndicator();
+}
+
+// Generate a time string based on internal millis()
+String DisplayManager::getTimeString() {
+  unsigned long currentTime = millis();
+  int seconds = (currentTime / 1000) % 60;
+  int minutes = (currentTime / 60000) % 60;
+  int hours = (currentTime / 3600000) % 24;
+  
+  char timeStr[20];
+  sprintf(timeStr, "%02d:%02d:%02d", hours, minutes, seconds);
+  return String(timeStr);
+}
+
+// Get current time from system time if available
+String DisplayManager::getCurrentTime() const {
+  if (!timeInitialized) {
+    return "Time not set";
+  }
+  
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo)) {
+    char timeStr[20];
+    strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &timeinfo);
+    return String(timeStr);
+  }
+  return "??:??:??";
+}
+
+// Get current date from system time if available
+String DisplayManager::getCurrentDate() const {
+  if (!timeInitialized) {
+    return "Date not set";
+  }
+  
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo)) {
+    char dateStr[20];
+    strftime(dateStr, sizeof(dateStr), "%d/%m/%Y", &timeinfo);
+    return String(dateStr);
+  }
+  return "??/??/????";
+}
+
+// Update time display in current view
+void DisplayManager::updateTimeDisplay() {
+  if (currentView == VIEW_MAIN) {
+    // Just redraw the header in main view to update time
+    drawHeader("WINE RACK");
+  } else if (currentView == VIEW_DETAIL && selectedBottle >= 0) {
+    // In detail view, redraw the header with the bottle name
+    BottlePosition bottlePos = bottleManager.getBottlePosition(selectedBottle);
+    if (bottlePos.bottleIndex >= 0) {
+      Bottle bottle = bottleManager.getBottle(bottlePos.bottleIndex);
+      String title = bottle.name;
+      if (title.length() > 20) {
+        title = title.substring(0, 17) + "...";
+      }
+      drawHeader(title.c_str());
+    } else {
+      String headerText = "POSITION DETAILS " + String(selectedBottle + 1);
+      drawHeader(headerText.c_str());
+    }
+  }
+}
+
+// Show a visual indicator for updates
+void DisplayManager::showUpdateIndicator() {
+  // Small indicator in bottom right corner
+  tft.fillRect(screenWidth - 120, screenHeight - 30, 110, 25, TFT_DARKGREEN);
+  tft.setTextColor(TFT_WHITE);
+  tft.setTextSize(SMALL_FONT);
+  tft.setCursor(screenWidth - 115, screenHeight - 20);
+  tft.print("Auto Update");
+  
+  showingUpdateIndicator = true;
+  updateIndicatorTimeout = millis() + 3000; // Set timeout 3 seconds from now
+}
+
+// Hide update indicator after timeout
+void DisplayManager::hideUpdateIndicator() {
+  if (showingUpdateIndicator) {
+    if (currentView == VIEW_MAIN) {
+      // Just clear the indicator area in main view
+      tft.fillRect(screenWidth - 120, screenHeight - 30, 110, 25, BACKGROUND);
+    }
+    showingUpdateIndicator = false;
+  }
+}
+
 // Draw the header section
 void DisplayManager::drawHeader(const char* title) {
   tft.fillRect(0, 0, screenWidth, 60, HEADER_COLOR);
@@ -33,6 +136,26 @@ void DisplayManager::drawHeader(const char* title) {
   tft.print(incomingData->bottleCount);
   tft.print("/");
   tft.print(BOTTLE_COUNT);
+  
+  // Display current time and date if available
+  if (timeInitialized) {
+    String currentTime = getCurrentTime();
+    String currentDate = getCurrentDate();
+    
+    tft.setTextSize(SMALL_FONT);
+    tft.setCursor(screenWidth - 190, 45);
+    tft.print(currentDate);
+    tft.print(" ");
+    tft.print(currentTime);
+  } else {
+    // Display last update time if time not initialized
+    if (lastUpdateTime > 0) {
+      tft.setTextSize(SMALL_FONT);
+      tft.setCursor(screenWidth - 190, 45);
+      tft.print("Last update: ");
+      tft.print(lastUpdateTimeString);
+    }
+  }
   
   // Add a separator line
   tft.fillRect(0, 60, screenWidth, 2, TFT_WHITE);
@@ -249,26 +372,23 @@ void DisplayManager::drawBottleDetail(int index) {
   tft.print(bottle.weight, 1);
   tft.print("g");
   
-  // Last interaction - Modified to be on same line and smaller font
+  // Last interaction - Modified to use same font size
   tft.setTextColor(TEXT_COLOR);
   tft.setCursor(infoX, infoY + 5 * lineHeight);
   tft.print("Last action: ");
   int lastActionLabelWidth = tft.textWidth("Last action: ");
-  
-  // Use smaller font for the date/time
-  tft.setTextSize(SMALL_FONT);
   tft.setTextColor(HIGHLIGHT_COLOR);
-  // Position text after the label on the same line
-  tft.setCursor(infoX + lastActionLabelWidth, infoY + 5 * lineHeight + 5); // +5 to align vertically
+  tft.setCursor(infoX + lastActionLabelWidth, infoY + 5 * lineHeight);
   tft.print(bottle.lastInteraction);
   
-  // Barcode - position moved up slightly
+  // Barcode - Modified to be on the same line
   tft.setTextColor(TEXT_COLOR);
   tft.setTextSize(MEDIUM_FONT);
   tft.setCursor(infoX, infoY + 6 * lineHeight);
   tft.print("Barcode: ");
-  tft.setTextSize(SMALL_FONT);
-  tft.setCursor(infoX, infoY + 6.5 * lineHeight);
+  int barcodeWidth = tft.textWidth("Barcode: ");
+  tft.setTextColor(HIGHLIGHT_COLOR);
+  tft.setCursor(infoX + barcodeWidth, infoY + 6 * lineHeight);
   tft.print(bottle.barcode);
   
   // Back button - moved up a bit to avoid overlap
@@ -283,43 +403,55 @@ void DisplayManager::showWelcomeScreen() {
   tft.fillRect(0, 0, screenWidth, 60, HEADER_COLOR);
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(LARGE_FONT);
-  tft.setCursor(20, 15);
-  tft.print("WINE RACK");
+  tft.setCursor(screenWidth / 2 - 150, 20);
+  tft.print("SMART SHELF DISPLAY");
   
   // Add a separator line
   tft.fillRect(0, 60, screenWidth, 2, TFT_WHITE);
   
-  // Draw wine bottle icons
-  for (int i = 0; i < 5; i++) {
-    int xPos = 75 + (i * 150);
-    tft.fillRoundRect(xPos, 120, 100, 220, 15, WINE_COLOR);
-    tft.fillRoundRect(xPos + 30, 100, 40, 30, 8, WINE_COLOR);
-    tft.drawRoundRect(xPos, 120, 100, 220, 15, TFT_WHITE);
-    tft.drawRoundRect(xPos + 30, 100, 40, 30, 8, TFT_WHITE);
-  }
-  
-  // Display welcome message
+  // Display centered large text
   tft.setTextColor(TFT_WHITE);
+  tft.setTextSize(LARGE_FONT);
+  
+  const char* welcomeText = "SMART SHELF DISPLAY";
+  int16_t textWidth = tft.textWidth(welcomeText);
+  int16_t textX = (screenWidth - textWidth) / 2;
+  tft.setCursor(textX, screenHeight / 2 - 30);
+  tft.print(welcomeText);
+  
+  // Display waiting message
   tft.setTextSize(MEDIUM_FONT);
-  tft.setCursor(160, 360);
-  tft.print("Waiting for Wine Rack connection...");
+  const char* waitingText = "Waiting for Wine Rack connection...";
+  textWidth = tft.textWidth(waitingText);
+  textX = (screenWidth - textWidth) / 2;
+  tft.setCursor(textX, screenHeight / 2 + 30);
+  tft.print(waitingText);
   
   // Display MAC address for pairing
   tft.setTextSize(SMALL_FONT);
-  tft.setCursor(250, 400);
-  tft.print("MAC Address: ");
-  tft.print(WiFi.macAddress());
+  const char* macText = "MAC Address: ";
+  String macAddress = WiFi.macAddress();
+  textWidth = tft.textWidth(macText) + tft.textWidth(macAddress.c_str());
+  textX = (screenWidth - textWidth) / 2;
+  tft.setCursor(textX, screenHeight / 2 + 80);
+  tft.print(macText);
+  tft.print(macAddress);
   
   // Add footer
   tft.fillRect(0, screenHeight - 30, screenWidth, 30, HEADER_COLOR);
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(SMALL_FONT);
-  tft.setCursor(screenWidth / 2 - 130, screenHeight - 20);
-  tft.print("Wine Rack Display Controller v1.0");
+  const char* footerText = "Wine Rack Display Controller v1.0";
+  textWidth = tft.textWidth(footerText);
+  textX = (screenWidth - textWidth) / 2;
+  tft.setCursor(textX, screenHeight - 20);
+  tft.print(footerText);
 }
 
 // Display status update as an overlay
 void DisplayManager::displayStatusUpdate() {
+  processingMessage = true;
+  
   // Show a status message at the bottom of the screen
   tft.fillRect(50, screenHeight - 150, screenWidth - 100, 80, HEADER_COLOR);
   tft.drawRect(50, screenHeight - 150, screenWidth - 100, 80, TFT_WHITE);
@@ -329,10 +461,14 @@ void DisplayManager::displayStatusUpdate() {
   
   // Draw the status message
   drawWrappedText(incomingData->text, 70, screenHeight - 130, screenWidth - 140, MEDIUM_FONT, TFT_WHITE);
+  
+  processingMessage = false;
 }
 
 // Display error message as an overlay
 void DisplayManager::displayErrorMessage() {
+  processingMessage = true;
+  
   // Show a prominent error message
   tft.fillRect(100, 160, screenWidth - 200, 160, ERROR_COLOR);
   tft.drawRect(100, 160, screenWidth - 200, 160, TFT_WHITE);
@@ -349,14 +485,64 @@ void DisplayManager::displayErrorMessage() {
   
   // Draw error message
   drawWrappedText(incomingData->text, 120, 230, screenWidth - 240, MEDIUM_FONT, TFT_WHITE);
+  
+  processingMessage = false;
 }
 
 // Update display based on incoming data
 void DisplayManager::updateDisplay(int messageType) {
-  // If we receive data for the first time, switch to the main view
-  if (messageType == MSG_TYPE_BOTTLE_DB) {
-    // Show the main bottle grid
-    drawBottleGrid();
+  // Set processing flag
+  processingMessage = true;
+  
+  // Update the timestamp whenever we receive any data
+  updateLastUpdateTime();
+  
+  // If we receive a bottle database update (type 1) or bottle info (type 2)
+  if (messageType == MSG_TYPE_BOTTLE_DB || messageType == MSG_TYPE_BOTTLE_INFO) {
+    // If it's the first bottle_db message or a full update, refresh screen
+    if (messageType == MSG_TYPE_BOTTLE_DB) {
+      // Show the main bottle grid
+      drawBottleGrid();
+    } 
+    // If it's just bottle info and we're in main view, update without full redraw
+    else if (messageType == MSG_TYPE_BOTTLE_INFO && currentView == VIEW_MAIN) {
+      // Redraw only the relevant bottle icons
+      for (int i = 0; i < BOTTLE_COUNT; i++) {
+        BottlePosition pos = bottleManager.getBottlePosition(i);
+        
+        // Convert the position index to display number (1-based)
+        int displayNumber = i + 1;
+        
+        // Display number mapping: 2,4,6,8,1,3,5,7,9
+        int displayOrderNumber;
+        switch (displayNumber) {
+          case 1: displayOrderNumber = 5; break;
+          case 2: displayOrderNumber = 1; break;
+          case 3: displayOrderNumber = 6; break;
+          case 4: displayOrderNumber = 2; break;
+          case 5: displayOrderNumber = 7; break;
+          case 6: displayOrderNumber = 3; break;
+          case 7: displayOrderNumber = 8; break;
+          case 8: displayOrderNumber = 4; break;
+          case 9: displayOrderNumber = 9; break;
+          default: displayOrderNumber = displayNumber;
+        }
+        
+        // Redraw the bottle with updated status
+        drawBottleIcon(pos.x, pos.y, pos.status, displayOrderNumber - 1);
+      }
+      
+      // Also redraw the header to update bottle count
+      drawHeader("WINE RACK");
+    }
+    // If we're in detail view and the current bottle is updated, refresh
+    else if (messageType == MSG_TYPE_BOTTLE_INFO && currentView == VIEW_DETAIL) {
+      // Redraw detail view with fresh data
+      drawBottleDetail(selectedBottle);
+    }
+    
+    // Show update indicator
+    showUpdateIndicator();
   }
   else if (messageType == MSG_TYPE_ERROR) {
     // Show error message as an overlay
@@ -384,6 +570,9 @@ void DisplayManager::updateDisplay(int messageType) {
       drawBottleDetail(selectedBottle);
     }
   }
+  
+  // Clear processing flag
+  processingMessage = false;
 }
 
 // Function to draw text with word wrap
@@ -481,7 +670,7 @@ void DisplayManager::handleTouch(uint16_t touchX, uint16_t touchY) {
   } 
   else if (currentView == VIEW_DETAIL) {
     // Check if "BACK" button was pressed
-    if (isButtonPressed(screenWidth / 2 - 100, screenHeight - 80, 200, 60, touchX, touchY)) {
+    if (isButtonPressed(screenWidth / 2 - 100, screenHeight - 100, 200, 60, touchX, touchY)) {
       Serial.println("BACK button pressed");
       drawBottleGrid();
     }

@@ -36,6 +36,8 @@ public:
   
   // Update a bottle from bottle_info_message
   void updateBottleFromMessage(const bottle_info_message& message);
+
+
 };
 
 // Declare external instance for global use
