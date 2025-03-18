@@ -223,14 +223,34 @@ void DisplayManager::drawBottleGrid() {
   tft.fillScreen(BACKGROUND);
   drawHeader("WINE RACK");
   
-  // Define the new order array: 2,4,6,8,1,3,5,7,9
-  int displayNumber[BOTTLE_COUNT] = {2, 4, 6, 8, 1, 3, 5, 7, 9};
+  // Correct display order mapping: top row (2,4,6,8) and bottom row (1,3,5,7,9)
+  // This array maps the position index (0-8) to the display number (1-9)
+  int positionToDisplayNumber[BOTTLE_COUNT] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
   
   // Draw each bottle in its position
   for (int i = 0; i < BOTTLE_COUNT; i++) {
     BottlePosition pos = bottleManager.getBottlePosition(i);
-    // Pass the display number instead of index for showing on bottle
-    drawBottleIcon(pos.x, pos.y, pos.status, displayNumber[i]-1);
+    
+    // Get the correct display number (1-based) for this position
+    int displayNumber;
+    
+    // Convert position index (0-8) to the correct display number (1-9)
+    // Following the specified layout: top row 2,4,6,8 and bottom row 1,3,5,7,9
+    switch (i) {
+      case 0: displayNumber = 2; break; // Top row, first position = 2
+      case 1: displayNumber = 4; break; // Top row, second position = 4
+      case 2: displayNumber = 6; break; // Top row, third position = 6
+      case 3: displayNumber = 8; break; // Top row, fourth position = 8
+      case 4: displayNumber = 1; break; // Bottom row, first position = 1
+      case 5: displayNumber = 3; break; // Bottom row, second position = 3
+      case 6: displayNumber = 5; break; // Bottom row, third position = 5
+      case 7: displayNumber = 7; break; // Bottom row, fourth position = 7
+      case 8: displayNumber = 9; break; // Bottom row, fifth position = 9
+      default: displayNumber = i + 1;   // Fallback
+    }
+    
+    // Draw the bottle with the correct display number (need to subtract 1 for index)
+    drawBottleIcon(pos.x, pos.y, pos.status, displayNumber - 1);
   }
   
   // Draw legend
@@ -267,13 +287,28 @@ void DisplayManager::drawBottleDetail(int index) {
   currentView = VIEW_DETAIL;
   selectedBottle = index;
   
+  // Convert the index (0-8) to the correct display number (1-9)
+  int displayNumber;
+  switch (index) {
+    case 0: displayNumber = 2; break; // Top row, first position = 2
+    case 1: displayNumber = 4; break; // Top row, second position = 4
+    case 2: displayNumber = 6; break; // Top row, third position = 6
+    case 3: displayNumber = 8; break; // Top row, fourth position = 8
+    case 4: displayNumber = 1; break; // Bottom row, first position = 1
+    case 5: displayNumber = 3; break; // Bottom row, second position = 3
+    case 6: displayNumber = 5; break; // Bottom row, third position = 5
+    case 7: displayNumber = 7; break; // Bottom row, fourth position = 7
+    case 8: displayNumber = 9; break; // Bottom row, fifth position = 9
+    default: displayNumber = index + 1; // Fallback
+  }
+  
   BottlePosition bottlePos = bottleManager.getBottlePosition(index);
   
   // If the bottle index is invalid or there's no information
   if (bottlePos.bottleIndex < 0) {
     // Empty slot, show basic screen
     tft.fillScreen(BACKGROUND);
-    String headerText = "POSITION DETAILS " + String(index + 1);
+    String headerText = "POSITION DETAILS " + String(displayNumber);
     drawHeader(headerText.c_str());
     
     tft.setTextColor(TFT_WHITE);
@@ -318,11 +353,11 @@ void DisplayManager::drawBottleDetail(int index) {
   tft.fillRoundRect(bottleX - (neckWidth / 2), bottleY - (bottleHeight / 2) - neckHeight, neckWidth, neckHeight, 5, bottleColor);
   tft.drawRoundRect(bottleX - (neckWidth / 2), bottleY - (bottleHeight / 2) - neckHeight, neckWidth, neckHeight, 5, TFT_WHITE);
   
-  // Show position
+  // Show position - use the display number instead of bottle.position
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(MEDIUM_FONT);
   tft.setCursor(bottleX - 10, bottleY - 15);
-  tft.print(bottle.position);
+  tft.print(displayNumber);
   
   // Show information on the right side
   int infoX = 280;
@@ -507,32 +542,29 @@ void DisplayManager::updateDisplay(int messageType) {
       // Show the main bottle grid
       drawBottleGrid();
     } 
-    // If it's just bottle info and we're in main view, update without full redraw
+    // In updateDisplay() function, inside the MSG_TYPE_BOTTLE_INFO case:
     else if (messageType == MSG_TYPE_BOTTLE_INFO && currentView == VIEW_MAIN) {
       // Redraw only the relevant bottle icons
       for (int i = 0; i < BOTTLE_COUNT; i++) {
         BottlePosition pos = bottleManager.getBottlePosition(i);
         
-        // Convert the position index to display number (1-based)
-        int displayNumber = i + 1;
-        
-        // Display number mapping: 2,4,6,8,1,3,5,7,9
-        int displayOrderNumber;
-        switch (displayNumber) {
-          case 1: displayOrderNumber = 5; break;
-          case 2: displayOrderNumber = 1; break;
-          case 3: displayOrderNumber = 6; break;
-          case 4: displayOrderNumber = 2; break;
-          case 5: displayOrderNumber = 7; break;
-          case 6: displayOrderNumber = 3; break;
-          case 7: displayOrderNumber = 8; break;
-          case 8: displayOrderNumber = 4; break;
-          case 9: displayOrderNumber = 9; break;
-          default: displayOrderNumber = displayNumber;
+        // Get correct display number for this position
+        int displayNumber;
+        switch (i) {
+          case 0: displayNumber = 2; break;
+          case 1: displayNumber = 4; break;
+          case 2: displayNumber = 6; break;
+          case 3: displayNumber = 8; break;
+          case 4: displayNumber = 1; break;
+          case 5: displayNumber = 3; break;
+          case 6: displayNumber = 5; break;
+          case 7: displayNumber = 7; break;
+          case 8: displayNumber = 9; break;
+          default: displayNumber = i + 1;
         }
         
-        // Redraw the bottle with updated status
-        drawBottleIcon(pos.x, pos.y, pos.status, displayOrderNumber - 1);
+        // Redraw the bottle with updated status and correct display number
+        drawBottleIcon(pos.x, pos.y, pos.status, displayNumber - 1);
       }
       
       // Also redraw the header to update bottle count
@@ -661,6 +693,7 @@ bool DisplayManager::isButtonPressed(int x, int y, int w, int h, uint16_t touchX
 }
 
 // Handle touch input
+// Handle touch input
 void DisplayManager::handleTouch(uint16_t touchX, uint16_t touchY) {
   if (currentView == VIEW_MAIN) {
     // Check if a bottle was touched
@@ -668,6 +701,25 @@ void DisplayManager::handleTouch(uint16_t touchX, uint16_t touchY) {
     if (bottleIndex >= 0) {
       Serial.print("Bottle touched: ");
       Serial.println(bottleIndex + 1);
+      
+      // Convert the touched index to the display number for logging purposes
+      int displayNumber;
+      switch (bottleIndex) {
+        case 0: displayNumber = 2; break;
+        case 1: displayNumber = 4; break;
+        case 2: displayNumber = 6; break;
+        case 3: displayNumber = 8; break;
+        case 4: displayNumber = 1; break;
+        case 5: displayNumber = 3; break;
+        case 6: displayNumber = 5; break;
+        case 7: displayNumber = 7; break;
+        case 8: displayNumber = 9; break;
+        default: displayNumber = bottleIndex + 1;
+      }
+      
+      Serial.print("Display position: ");
+      Serial.println(displayNumber);
+      
       drawBottleDetail(bottleIndex);
     }
   } 
