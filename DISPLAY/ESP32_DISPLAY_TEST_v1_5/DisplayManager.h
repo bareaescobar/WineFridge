@@ -29,7 +29,7 @@ public:
   DisplayManager(struct_message* data);
   
   // Main display functions
-  void showWelcomeScreen();
+  void showWelcomeScreen(const char* statusMessage = "Waiting for connection...");
   void drawBottleGrid();
   void drawBottleDetail(int index);
   void displayStatusUpdate();
@@ -57,7 +57,7 @@ public:
   void hideUpdateIndicator();
   String getTimeString();
   
-  // New time-related functions
+  // Time-related functions
   void setTimeInitialized(bool initialized) { timeInitialized = initialized; }
   bool isTimeInitialized() const { return timeInitialized; }
   String getCurrentTime() const;

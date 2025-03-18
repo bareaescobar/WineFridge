@@ -1,16 +1,7 @@
 /**
  * WineRackDisplay.ino
  * Main file for the Wine Rack Display for CrowPanel ESP32-S3 7-inch Display
- * 
- * This code implements ESP-NOW communication to display Wine Rack information
- * on a CrowPanel 7-inch display with ESP32-S3.
  */
-
-//ESP32s3 DEV MODULE
-//COM8
-//PSRAM: OPI PSRAM
-//PARTITION SCHEME: HUGE APP
-//LovyanGFX lib
 
 #include <Wire.h>
 #include <SPI.h>
@@ -18,9 +9,6 @@
 #include <esp_now.h>
 #include <time.h>
 
-/*******************************************************************************
-   Config the display panel and touch panel in gfx_conf.h
- ******************************************************************************/
 #include "gfx_conf.h"
 #include "config.h"
 #include "DataStructures.h"
@@ -28,80 +16,100 @@
 #include "CommunicationManager.h"
 #include "DisplayManager.h"
 
-// WiFi configuration - using same credentials as the Wine Shelf
+// WiFi configuration
 #define WIFI_SSID "Bareas_WIFI"
 #define WIFI_PASSWORD "bareaescobar"
+#define WIFI_TIMEOUT 10000  // 10 second timeout for connection
 
-// NTP server configuration
+// NTP configuration
 const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600;      // GMT+1
 const int daylightOffset_sec = 3600;  // Adjust for DST
 
-// Define global variables
+// Global variables
 uint32_t lastTouchTime = 0;
 bool ledState = false;
 uint32_t lastBlink = 0;
 bool timeInitialized = false;
 
-// External objects - declared elsewhere, used here
+// External objects
 extern CommunicationManager commManager;
 extern BottleManager bottleManager;
-DisplayManager* displayManager = NULL; // Will be initialized in setup()
+DisplayManager* displayManager = NULL;
 
-// Function to connect to WiFi and initialize time
+// Function to sync time
+bool syncTimeWithNTP() {
+  Serial.println("Setting up time with NTP...");
+  
+  // Add struct tm declaration here
+  struct tm timeinfo;
+  
+  // Configure NTP
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  
+  // Wait for time to be set
+  unsigned long startAttempt = millis();
+  while (!getLocalTime(&timeinfo) && millis() - startAttempt < 5000) {
+    delay(100);
+  }
+  
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time");
+    return false;
+  }
+  
+  char timeStringBuf[50];
+  strftime(timeStringBuf, sizeof(timeStringBuf), "%A, %B %d %Y %H:%M:%S", &timeinfo);
+  Serial.print("Current time: ");
+  Serial.println(timeStringBuf);
+  return true;
+}
+
+// Setup WiFi and time
 void setupWiFiAndTime() {
-  Serial.println("Connecting to WiFi to sync time...");
+  Serial.println("Connecting to WiFi for time sync...");
+  
+  // Store current WiFi mode
+  wifi_mode_t currentMode = WiFi.getMode();
+  
+  // Connect to WiFi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   
-  int retries = 0;
-  while (WiFi.status() != WL_CONNECTED && retries < 20) {
+  unsigned long startAttempt = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < WIFI_TIMEOUT) {
     delay(500);
     Serial.print(".");
-    retries++;
   }
   
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nWiFi connected. Setting up time...");
+    Serial.println("\nWiFi connected!");
     
-    // Configure time with NTP
-    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+    // Sync time
+    timeInitialized = syncTimeWithNTP();
     
-    struct tm timeinfo;
-    if (getLocalTime(&timeinfo)) {
-      char timeStringBuf[50];
-      strftime(timeStringBuf, sizeof(timeStringBuf), "%A, %B %d %Y %H:%M:%S", &timeinfo);
-      Serial.print("Current time: ");
-      Serial.println(timeStringBuf);
-      timeInitialized = true;
-    } else {
-      Serial.println("Failed to obtain time");
-    }
-    
-    // Disconnect from WiFi but keep station mode for ESP-NOW
-    WiFi.disconnect(false);  // Disconnect but keep WiFi hardware initialized
+    // Disconnect but keep WiFi hardware initialized
+    WiFi.disconnect(true, false);
   } else {
-    Serial.println("\nFailed to connect to WiFi for time sync");
+    Serial.println("\nWiFi connection failed");
   }
   
-  // Set WiFi to station mode for ESP-NOW
+  // Return to original mode (or STA for ESP-NOW)
   WiFi.mode(WIFI_STA);
+  delay(100);
 }
 
 void setup() {
-  // Initialize serial communication
   Serial.begin(115200);
   delay(1000);
   
   Serial.println("\n===== Wine Rack Display - CrowPanel ESP32 =====");
   
   // Initialize display
-  Serial.println("Initializing display...");
   tft.begin();
   tft.fillScreen(TFT_BLACK);
   tft.setTextSize(MEDIUM_FONT);
   
-  // Test color sequence
-  Serial.println("Testing display...");
+  // Test display with color sequence
   tft.fillScreen(TFT_BLUE);
   delay(500);
   tft.fillScreen(TFT_YELLOW);
@@ -112,17 +120,26 @@ void setup() {
   delay(500);
   tft.fillScreen(TFT_BLACK);
   
-  // Setup WiFi and time before ESP-NOW
+  // Create display manager first
+  displayManager = new DisplayManager(commManager.getIncomingData());
+  
+  // Show initial welcome screen
+  displayManager->showWelcomeScreen("Initializing...");
+  
+  // Setup WiFi and time - do this before ESP-NOW
   setupWiFiAndTime();
   
-  // Initialize the DisplayManager with the communication data
-  displayManager = new DisplayManager(commManager.getIncomingData());
+  // Update display manager with time status
   displayManager->setTimeInitialized(timeInitialized);
   
-  // Initialize ESP-NOW communication
-  Serial.println("Setting up ESP-NOW...");
+  // Initialize ESP-NOW after WiFi
+  displayManager->showWelcomeScreen("Setting up communication...");
+  
+  // Initialize bottle positions
+  bottleManager.initializeBottlePositions();
+  
+  // Initialize ESP-NOW
   if (!commManager.initESPNow()) {
-    // Show error on display
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_RED);
     tft.setTextSize(MEDIUM_FONT);
@@ -131,66 +148,57 @@ void setup() {
     return;
   }
   
-  // Initialize bottle positions
-  bottleManager.initializeBottlePositions();
-  
   Serial.println("Ready to receive data from Wine Rack");
   
-  // Show welcome screen
-  Serial.println("Showing welcome screen...");
-  displayManager->showWelcomeScreen();
+  // Show final welcome screen
+  displayManager->showWelcomeScreen("Waiting for connection...");
 }
 
 void loop() {
-  // Update time every minute
+  // Update time display periodically
   static unsigned long lastTimeUpdate = 0;
-  if (timeInitialized && millis() - lastTimeUpdate > 60000) { // Update time every minute
+  if (timeInitialized && millis() - lastTimeUpdate > 60000) {
     lastTimeUpdate = millis();
-    
-    // Only update the time display if we're showing a view (not processing a message)
     if (displayManager && !displayManager->isProcessingMessage()) {
       displayManager->updateTimeDisplay();
     }
   }
-
+  
+  // Process any pending messages
+  commManager.processBufferedMessages();
+  
   // Show activity indicator
   if (millis() - lastBlink > 1000) {
     lastBlink = millis();
     ledState = !ledState;
     
-    // Draw a small indicator circle to show the system is running
+    // Draw indicator
     tft.fillCircle(screenWidth - 20, 20, 10, 
                   ledState ? TFT_GREEN : TFT_DARKGREEN);
-                  
-    // Check if we need to hide update indicator
+    
+    // Hide update indicator if needed
     if (displayManager && displayManager->shouldHideUpdateIndicator()) {
       displayManager->hideUpdateIndicator();
     }
     
-    // Process any incoming messages that might be buffered
-    commManager.processBufferedMessages();
-    
-    // Every 10 seconds, print a status message to help with debugging
+    // Status log every 10 seconds
     static int statusCounter = 0;
     statusCounter++;
     if (statusCounter >= 10) {
       statusCounter = 0;
-      Serial.println("Display is running... Waiting for ESP-NOW data.");
+      Serial.println("Display running... Waiting for ESP-NOW data");
     }
   }
   
-  // Get touch input and process it
+  // Process touch input
   uint16_t touchX, touchY;
   bool touched = tft.getTouch(&touchX, &touchY);
   
   if (touched && (millis() - lastTouchTime > TOUCH_DEBOUNCE)) {
     lastTouchTime = millis();
-    Serial.print("Touch detected at X:");
-    Serial.print(touchX);
-    Serial.print(" Y:");
-    Serial.println(touchY);
+    Serial.printf("Touch at X:%d Y:%d\n", touchX, touchY);
     
-    // Process touch input
+    // Process touch
     displayManager->handleTouch(touchX, touchY);
   }
   

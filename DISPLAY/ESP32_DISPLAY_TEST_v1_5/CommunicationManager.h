@@ -9,7 +9,6 @@
 #include <esp_now.h>
 #include "DataStructures.h"
 
-// Message buffer constants
 #define MAX_BUFFER_SIZE 10
 #define MAX_MESSAGE_SIZE 512
 
@@ -22,11 +21,12 @@ private:
   simple_message simpleData;       // Simplified structure
   bottle_info_message bottleInfo;  // Bottle info message structure
   
-  // Message buffer to handle quick message arrivals
+  // Message buffer
   struct MessageBuffer {
     uint8_t data[MAX_MESSAGE_SIZE];
     size_t length;
     bool used;
+    unsigned long timestamp;
   };
   
   MessageBuffer messageBuffer[MAX_BUFFER_SIZE];
@@ -51,11 +51,11 @@ public:
   // Get reference to incoming data
   struct_message* getIncomingData() { return &incomingData; }
   
-  // Static callback function (will call instance method)
+  // Static callback function
   static void staticOnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *incomingBuf, int len);
 };
 
-// Declare external instance for global use
+// Global instance
 extern CommunicationManager commManager;
 
 #endif // COMMUNICATION_MANAGER_H

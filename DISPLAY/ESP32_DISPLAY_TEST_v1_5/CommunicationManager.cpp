@@ -5,16 +5,15 @@
 
 #include "CommunicationManager.h"
 #include "DisplayManager.h"
-#include "BottleManager.h"  // Include the full definition, not just forward declaration
-#include <WiFi.h>  // Include WiFi for ESP-NOW
+#include "BottleManager.h"
+#include <WiFi.h>
 #include <esp_now.h>
 
-// Declare reference to the display manager
+// References to external objects
 extern DisplayManager* displayManager;
-// Declare reference to the bottle manager at global scope
 extern BottleManager bottleManager;
 
-// Define the global instance
+// Global instance
 CommunicationManager commManager;
 
 // Constructor
@@ -34,8 +33,9 @@ CommunicationManager::CommunicationManager() {
 
 // Initialize ESP-NOW
 bool CommunicationManager::initESPNow() {
-  // Set device as a Wi-Fi Station
+  // Ensure proper WiFi mode
   WiFi.mode(WIFI_STA);
+  delay(100);
   
   // Initialize ESP-NOW
   if (esp_now_init() != ESP_OK) {
@@ -43,7 +43,7 @@ bool CommunicationManager::initESPNow() {
     return false;
   }
   
-  // Register callback function for received data
+  // Register callback
   esp_now_register_recv_cb(staticOnDataRecv);
   
   Serial.println("ESP-NOW initialized successfully");
@@ -53,44 +53,53 @@ bool CommunicationManager::initESPNow() {
   return true;
 }
 
-// Static callback function (to be registered with ESP-NOW)
+// Static callback function
 void CommunicationManager::staticOnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *incomingBuf, int len) {
-  // Buffer the message for later processing to avoid blocking callback
+  // Buffer message for later processing
   commManager.bufferMessage(incomingBuf, len);
 }
 
-// Buffer the received message
+// Buffer a message
 void CommunicationManager::bufferMessage(const uint8_t *data, size_t length) {
   if (length > MAX_MESSAGE_SIZE) {
     Serial.println("Message too large for buffer");
     return;
   }
   
-  // Find a free buffer slot
-  int index = bufferIndex;
-  int attempts = 0;
-  
-  while (messageBuffer[index].used && attempts < MAX_BUFFER_SIZE) {
-    index = (index + 1) % MAX_BUFFER_SIZE;
-    attempts++;
+  // Find free slot
+  int slot = -1;
+  for (int i = 0; i < MAX_BUFFER_SIZE; i++) {
+    if (!messageBuffer[i].used) {
+      slot = i;
+      break;
+    }
   }
   
-  if (attempts >= MAX_BUFFER_SIZE) {
-    Serial.println("No free buffer slots available - message lost");
-    return;
+  // If no free slot, overwrite oldest
+  if (slot == -1) {
+    unsigned long oldest = ULONG_MAX;
+    for (int i = 0; i < MAX_BUFFER_SIZE; i++) {
+      if (messageBuffer[i].timestamp < oldest) {
+        oldest = messageBuffer[i].timestamp;
+        slot = i;
+      }
+    }
+    Serial.println("Buffer full, overwriting oldest message");
   }
   
-  // Copy message to buffer
-  memcpy(messageBuffer[index].data, data, length);
-  messageBuffer[index].length = length;
-  messageBuffer[index].used = true;
+  // Copy message
+  memcpy(messageBuffer[slot].data, data, length);
+  messageBuffer[slot].length = length;
+  messageBuffer[slot].used = true;
+  messageBuffer[slot].timestamp = millis();
   
-  bufferIndex = (index + 1) % MAX_BUFFER_SIZE;
+  Serial.print("Message buffered in slot ");
+  Serial.println(slot);
 }
 
-// Process any buffered messages
+// Process buffered messages
 void CommunicationManager::processBufferedMessages() {
-  if (processingBuffer) return; // Prevent reentrant calls
+  if (processingBuffer) return;
   
   processingBuffer = true;
   
@@ -104,27 +113,27 @@ void CommunicationManager::processBufferedMessages() {
   processingBuffer = false;
 }
 
-// Process incoming ESP-NOW data
+// Process incoming data
 void CommunicationManager::processIncomingData(const uint8_t *incomingBuf, int len) {
-  // Check data type based on size
+  // Check message type by size
   if (len == sizeof(struct_message)) {
-    // Regular message
+    // Full message
     memcpy(&incomingData, incomingBuf, sizeof(struct_message));
     Serial.print("Full message received: ");
     Serial.println(incomingData.messageType);
     
-    // Update display based on message type
+    // Update display
     if (displayManager != NULL) {
       displayManager->updateDisplay(incomingData.messageType);
     }
   } 
   else if (len == sizeof(simple_message)) {
-    // Simple message (status, error)
+    // Simple message
     memcpy(&simpleData, incomingBuf, sizeof(simple_message));
     Serial.print("Simple message received: ");
     Serial.println(simpleData.messageType);
     
-    // Copy to the main structure for display
+    // Copy to main structure
     incomingData.messageType = simpleData.messageType;
     strncpy(incomingData.trayID, simpleData.trayID, sizeof(simpleData.trayID));
     strncpy(incomingData.text, simpleData.text, sizeof(simpleData.text));
@@ -136,24 +145,17 @@ void CommunicationManager::processIncomingData(const uint8_t *incomingBuf, int l
     }
   }
   else if (len == sizeof(bottle_info_message)) {
-    // Bottle info message
+    // Bottle info
     memcpy(&bottleInfo, incomingBuf, sizeof(bottle_info_message));
-    Serial.print("Bottle info message received for bottle index ");
+    Serial.print("Bottle info received: ");
     Serial.println(bottleInfo.bottleIndex);
     
-    // Copy to the main structure for display
+    // Copy to main structure
     incomingData.messageType = bottleInfo.messageType;
     strncpy(incomingData.trayID, bottleInfo.trayID, sizeof(bottleInfo.trayID));
     
-    // Update bottle data - No local extern declaration needed
+    // Update bottle data
     bottleManager.updateBottleFromMessage(bottleInfo);
-    
-    // Log this as an automatic update if appropriate
-    static unsigned long lastUserAction = 0;
-    unsigned long currentTime = millis();
-    if (currentTime - lastUserAction > 15000) { // If no user action in 15 seconds
-      Serial.println("Automatic update received");
-    }
     
     // Update display
     if (displayManager != NULL) {
@@ -161,7 +163,7 @@ void CommunicationManager::processIncomingData(const uint8_t *incomingBuf, int l
     }
   }
   else {
-    Serial.print("Unknown message format. Size: ");
+    Serial.print("Unknown message format: ");
     Serial.println(len);
   }
 }

@@ -395,56 +395,59 @@ void DisplayManager::drawBottleDetail(int index) {
   drawButton(screenWidth / 2 - 100, screenHeight - 100, 200, 60, "BACK", HEADER_COLOR);
 }
 
-// Show welcome screen while waiting for connection
-void DisplayManager::showWelcomeScreen() {
+// Show welcome screen with status message
+void DisplayManager::showWelcomeScreen(const char* statusMessage) {
   tft.fillScreen(BACKGROUND);
   
   // Draw header
   tft.fillRect(0, 0, screenWidth, 60, HEADER_COLOR);
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(LARGE_FONT);
-  tft.setCursor(screenWidth / 2 - 150, 20);
-  tft.print("SMART SHELF DISPLAY");
   
-  // Add a separator line
+  // Center title text "SMART SHELF DISPLAY"
+  const char* titleText = "SMART SHELF DISPLAY";
+  int16_t textWidth = tft.textWidth(titleText);
+  tft.setCursor((screenWidth - textWidth) / 2, 20);
+  tft.print(titleText);
+  
+  // Add separator line
   tft.fillRect(0, 60, screenWidth, 2, TFT_WHITE);
   
-  // Display centered large text
-  tft.setTextColor(TFT_WHITE);
-  tft.setTextSize(LARGE_FONT);
+  // Show large version of title in center
+  tft.setTextSize(LARGE_FONT + 1);
+  textWidth = tft.textWidth(titleText) * 1.5; // Approximate width with larger font
+  tft.setCursor((screenWidth - textWidth) / 2, screenHeight / 2 - 50);
+  tft.print(titleText);
   
-  const char* welcomeText = "SMART SHELF DISPLAY";
-  int16_t textWidth = tft.textWidth(welcomeText);
-  int16_t textX = (screenWidth - textWidth) / 2;
-  tft.setCursor(textX, screenHeight / 2 - 30);
-  tft.print(welcomeText);
-  
-  // Display waiting message
+  // Show status message
   tft.setTextSize(MEDIUM_FONT);
-  const char* waitingText = "Waiting for Wine Rack connection...";
-  textWidth = tft.textWidth(waitingText);
-  textX = (screenWidth - textWidth) / 2;
-  tft.setCursor(textX, screenHeight / 2 + 30);
-  tft.print(waitingText);
+  textWidth = tft.textWidth(statusMessage);
+  tft.setCursor((screenWidth - textWidth) / 2, screenHeight / 2 + 50);
+  tft.print(statusMessage);
   
-  // Display MAC address for pairing
+  // Show MAC address
   tft.setTextSize(SMALL_FONT);
-  const char* macText = "MAC Address: ";
-  String macAddress = WiFi.macAddress();
-  textWidth = tft.textWidth(macText) + tft.textWidth(macAddress.c_str());
-  textX = (screenWidth - textWidth) / 2;
-  tft.setCursor(textX, screenHeight / 2 + 80);
-  tft.print(macText);
+  String macAddress = "MAC: " + WiFi.macAddress();
+  textWidth = tft.textWidth(macAddress.c_str());
+  tft.setCursor((screenWidth - textWidth) / 2, screenHeight / 2 + 100);
   tft.print(macAddress);
+  
+  // Show time if available
+  if (timeInitialized) {
+    String currentTime = getCurrentTime();
+    String currentDate = getCurrentDate();
+    String timeText = currentDate + " " + currentTime;
+    
+    textWidth = tft.textWidth(timeText.c_str());
+    tft.setCursor((screenWidth - textWidth) / 2, screenHeight / 2 + 130);
+    tft.print(timeText);
+  }
   
   // Add footer
   tft.fillRect(0, screenHeight - 30, screenWidth, 30, HEADER_COLOR);
-  tft.setTextColor(TFT_WHITE);
-  tft.setTextSize(SMALL_FONT);
-  const char* footerText = "Wine Rack Display Controller v1.0";
+  const char* footerText = "v1.0";
   textWidth = tft.textWidth(footerText);
-  textX = (screenWidth - textWidth) / 2;
-  tft.setCursor(textX, screenHeight - 20);
+  tft.setCursor((screenWidth - textWidth) / 2, screenHeight - 20);
   tft.print(footerText);
 }
 
