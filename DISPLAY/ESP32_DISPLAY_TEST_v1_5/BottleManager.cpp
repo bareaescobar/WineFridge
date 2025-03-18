@@ -21,7 +21,6 @@ BottleManager::BottleManager() {
 }
 
 // Initialize bottle positions on the screen
-// Initialize bottle positions on the screen
 void BottleManager::initializeBottlePositions() {
   // Set positions in a 2-row grid (4 on top, 5 on bottom)
   int centerX = screenWidth / 2;
@@ -111,6 +110,15 @@ void BottleManager::updateBottleFromMessage(const bottle_info_message& message) 
     int index = message.bottleIndex;
     int position = message.bottlePosition - 1; // Convert from 1-based to 0-based
     
+    // If it's an empty bottle, just update the position status
+    if (message.isEmpty) {
+      if (position >= 0 && position < BOTTLE_COUNT) {
+        bottlePositions[position].status = BOTTLE_EMPTY;
+        bottlePositions[position].bottleIndex = -1;
+      }
+      return;
+    }
+    
     // Update the bottle data
     localBottles[index].barcode = message.barcode;
     localBottles[index].name = message.name;
@@ -127,6 +135,14 @@ void BottleManager::updateBottleFromMessage(const bottle_info_message& message) 
       bottlePositions[position].bottleIndex = index;
       bottlePositions[position].status = message.inFridge ? BOTTLE_PRESENT : BOTTLE_WAITING;
     }
+  }
+}
+
+// Update position status directly
+void BottleManager::updatePositionStatus(int position, const BottlePosition& posData) {
+  if (position >= 0 && position < BOTTLE_COUNT) {
+    bottlePositions[position].status = posData.status;
+    bottlePositions[position].bottleIndex = posData.bottleIndex;
   }
 }
 

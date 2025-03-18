@@ -24,6 +24,9 @@ private:
   
   bool timeInitialized;  // Flag to indicate if time has been initialized
   bool processingMessage; // Flag to indicate if we're processing a message
+  
+  // Fixed position numbers array for consistent bottle numbering
+  int positionNumbers[9] = {2, 4, 6, 8, 1, 3, 5, 7, 9};
 
 public:
   DisplayManager(struct_message* data);
@@ -38,7 +41,7 @@ public:
   
   // Helper functions
   void drawHeader(const char* title);
-  void drawBottleIcon(int x, int y, int status, int index);
+  void drawBottleIcon(int x, int y, int status, int positionIndex);
   void drawWrappedText(const char* text, int x, int y, int maxWidth, uint8_t font, uint16_t color);
   void drawButton(int x, int y, int w, int h, const char* text, uint16_t color);
   

@@ -9,9 +9,6 @@
 #include <esp_now.h>
 #include "DataStructures.h"
 
-#define MAX_BUFFER_SIZE 10
-#define MAX_MESSAGE_SIZE 512
-
 // Forward declaration
 class BottleManager;
 
@@ -20,18 +17,6 @@ private:
   struct_message incomingData;     // Original structure
   simple_message simpleData;       // Simplified structure
   bottle_info_message bottleInfo;  // Bottle info message structure
-  
-  // Message buffer
-  struct MessageBuffer {
-    uint8_t data[MAX_MESSAGE_SIZE];
-    size_t length;
-    bool used;
-    unsigned long timestamp;
-  };
-  
-  MessageBuffer messageBuffer[MAX_BUFFER_SIZE];
-  int bufferIndex;
-  bool processingBuffer;
   
 public:
   CommunicationManager();
@@ -42,20 +27,17 @@ public:
   // Process incoming ESP-NOW data
   void processIncomingData(const uint8_t *incomingBuf, int len);
   
-  // Process any buffered messages
+  // Process any buffered messages (called in main loop)
   void processBufferedMessages();
-  
-  // Buffer a new message
-  void bufferMessage(const uint8_t *data, size_t length);
   
   // Get reference to incoming data
   struct_message* getIncomingData() { return &incomingData; }
   
-  // Static callback function
+  // Static callback function (will call instance method)
   static void staticOnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *incomingBuf, int len);
 };
 
-// Global instance
+// Declare external instance for global use
 extern CommunicationManager commManager;
 
 #endif // COMMUNICATION_MANAGER_H

@@ -37,7 +37,8 @@ public:
   // Update a bottle from bottle_info_message
   void updateBottleFromMessage(const bottle_info_message& message);
 
-
+  // Update a position status directly (for empty bottles)
+  void updatePositionStatus(int position, const BottlePosition& posData);
 };
 
 // Declare external instance for global use

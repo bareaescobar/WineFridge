@@ -19,7 +19,7 @@ Bottle bottles[BOTTLE_COUNT];  // Definición de la variable global para la base
 Preferences preferences;       // Definición de la variable global para las preferencias
 
 unsigned long lastUpdateTime = 0;
-const unsigned long UPDATE_INTERVAL = 30000; // 30 seconds in milliseconds
+const unsigned long UPDATE_INTERVAL = 10000; // 30 seconds in milliseconds
 bool systemBusy = false; // Flag to indicate if system is currently executing a command
 
 

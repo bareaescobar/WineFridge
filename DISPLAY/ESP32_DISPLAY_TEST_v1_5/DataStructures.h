@@ -53,6 +53,7 @@ typedef struct bottle_info_message {
   float weight;        // Weight
   char lastInteraction[30]; // Last interaction time
   bool inFridge;       // Whether the bottle is in the rack
+  bool isEmpty;        // Whether this is an empty bottle slot
 } bottle_info_message;
 
 // Structure for bottle position on screen
