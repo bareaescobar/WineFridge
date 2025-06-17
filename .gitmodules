@@ -1,0 +1,3 @@
+[submodule "RPI/frontend/WineFridge_web"]
+	path = RPI/frontend/WineFridge_web
+	url = https://github.com/bareaescobar/WineFridge_web.git
