@@ -27,7 +27,7 @@ class BarcodeScanner:
 
         # Configure serial port (adjust as needed)
         self.serial = serial.Serial(
-            port='/dev/'ttyAMA0,      # or '/dev/ttyS0' depending on your Pi model
+            port='/dev/ttyAMA0',      # or '/dev/ttyS0' depending on your Pi model
             baudrate=115200,
             timeout=0.1
         )

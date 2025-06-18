@@ -1,9 +1,0 @@
-{
-  "dependencies": {
-    "express": "^5.1.0",
-    "http": "^0.0.1-security",
-    "mqtt": "^5.13.1",
-    "vite": "^6.3.5",
-    "ws": "^8.18.2"
-  }
-}

@@ -8,7 +8,7 @@ import os
 # === File Paths ===
 INVENTORY_PATH = "backend/database/inventory.json"
 CATALOG_PATH = "backend/database/wine-catalog.json"
-LOG_PATH = "logs/mqtt.log"
+LOG_PATH = "../logs/mqtt.log"
 
 class WineFridgeController:
     def __init__(self):
