@@ -4,11 +4,30 @@ import json
 from datetime import datetime
 import time
 
+def find_serial_port():
+    import glob
+    ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyAMA*') + glob.glob('/dev/ttyS*')
+    for port in ports:
+        try:
+            ser = serial.Serial(port, 115200, timeout=0.1)
+            ser.close()
+            return port
+        except:
+            continue
+    return None
+
 class BarcodeScanner:
     def __init__(self):
+        port = find_serial_port() or '/dev/ttyAMA0'
+        self.serial = serial.Serial(
+            port=port,
+            baudrate=115200,
+            timeout=0.1
+        )
+
         # Configure serial port (adjust as needed)
         self.serial = serial.Serial(
-            port='/dev/ttyS0',      # or '/dev/ttyAMA0' depending on your Pi model
+            port='/dev/'ttyAMA0,      # or '/dev/ttyS0' depending on your Pi model
             baudrate=115200,
             timeout=0.1
         )
