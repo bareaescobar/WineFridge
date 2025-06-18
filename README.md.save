@@ -1,0 +1,55 @@
+Smart Wine Fridge Web UI & Control System
+A modern IoT wine management system combining a responsive web interface with intelligent hardware controllers for automated bottle tracking, climate monitoring, and LED-guided bottle placement.
+🏗️ System Architecture
+The Smart Wine Fridge consists of three main components:
+
+Web UI (Frontend): Vite-based responsive interface for wine management
+Raspberry Pi Controller (Backend): Central brain managing MQTT, web server, and databases
+ESP32 Modules (Hardware): Drawer controllers with sensors, LEDs, and actuators
+
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Web Browser   │◄──►│  Raspberry Pi   │◄──►│ ESP32 Drawers   │
+│   (Frontend)    │    │   (Backend)     │    │   (Hardware)    │
+│                 │    │                 │    │                 │
+│ • User Interface│    │ • MQTT Broker   │    │ • Weight Sensors│
+│ • Wine Catalog  │    │ • Web Server    │    │ • LED Strips    │
+│ • Notifications │    │ • Database      │    │ • Temp/Humidity │
+│ • Controls      │    │ • Barcode Reader│    │ • Position Detect│
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+📋 Prerequisites
+Software Requirements
+
+Node.js (v18 or higher)
+Python 3 (3.8+)
+Raspberry Pi OS (64-bit recommended)
+Git
+
+Package Managers
+
+pnpm (recommended) or npm
+pip3 for Python packages
+
+Hardware Requirements
+
+Raspberry Pi 5 (2GB+ RAM)
+ESP32 Development Boards (CP2102 recommended)
+Raspberry Pi Touch Screen (optional)
+M5Unit QRCode Scanner
+Load cells, LEDs, sensors (see hardware specs below)
+
+🔧 Installation Guide
+Step 1: System Preparation (Raspberry Pi)
+bash# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install required packages
+sudo apt install -y nodejs npm python3-pip git mosquitto mosquitto-clients
+
+# Install PM2 globally for process management
+sudo npm install -g pm2
+
+# Install Python dependencies
+pip3 install paho-mqtt pyserial
+Step 2: Clone Repository
+bash# Navigate to installation directory
+cd /home/plasticlab
