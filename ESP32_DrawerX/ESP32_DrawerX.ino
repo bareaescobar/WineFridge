@@ -117,12 +117,20 @@ void setup() {
   
   // Connect to WiFi
   connectWiFi();
+
+  WiFi.setSleep(false);
   
   // Only try MQTT if WiFi is connected
   if (WiFi.status() == WL_CONNECTED) {
     // Setup MQTT
     mqttClient.setServer(MQTT_BROKER_IP, MQTT_PORT);
     mqttClient.setCallback(onMQTTMessage);
+
+    // --- PATCH para routers WiFi6 / evitar rc=-2 ---
+    mqttClient.setSocketTimeout(10);  // 10 segundos timeout socket
+    mqttClient.setKeepAlive(60);      // 60 segundos keepalive
+    // --- FIN PATCH ---
+    
     connectMQTT();
   }
   
