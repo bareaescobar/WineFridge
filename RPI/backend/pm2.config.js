@@ -14,6 +14,12 @@ module.exports = {
       name: 'web-server',
       cwd: '../frontend/WineFridge_web',
       script: 'server.js'
+    },
+    {
+      name: 'frontend',
+      cwd: '../frontend/WineFridge_web',
+      script: 'npm',
+      args: 'run dev'
     }
   ]
 };
