@@ -1,14 +1,12 @@
 # Smart Wine Fridge Web UI & Control System
-
 A modern IoT wine management system combining a responsive web interface with intelligent hardware controllers for automated bottle tracking, climate monitoring, and LED-guided bottle placement.
 
 ## 🏗️ System Architecture
-
 The Smart Wine Fridge consists of three main components:
 
-- **Web UI** (Frontend): Vite-based responsive interface for wine management
-- **Raspberry Pi Controller** (Backend): Central brain managing MQTT, web server, and databases
-- **ESP32 Modules** (Hardware): Drawer controllers with sensors, LEDs, and actuators
+- **Web UI (Frontend)**: Vite-based responsive interface for wine management
+- **Raspberry Pi Controller (Backend)**: Central brain managing MQTT, web server, and databases  
+- **ESP32 Modules (Hardware)**: Drawer controllers with sensors, LEDs, and actuators
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -25,103 +23,75 @@ The Smart Wine Fridge consists of three main components:
 ## 📋 Prerequisites
 
 ### Software Requirements
-- **Node.js** (v18 or higher)
-- **Python 3** (3.8+)
-- **Raspberry Pi OS** (64-bit recommended)
-- **Git**
+- Node.js (v18 or higher)
+- Python 3 (3.8+)
+- Raspberry Pi OS (64-bit recommended)
+- Git
 
 ### Package Managers
-- **pnpm** (recommended) or **npm**
-- **pip3** for Python packages
+- npm for Node.js packages
+- apt for system packages
 
 ### Hardware Requirements
-- **Raspberry Pi 5** (2GB+ RAM)
-- **ESP32 Development Boards** (CP2102 recommended)
-- **Raspberry Pi Touch Screen** (optional)
-- **M5Unit QRCode Scanner**
-- **Load cells, LEDs, sensors** (see hardware specs below)
+- Raspberry Pi 5 (2GB+ RAM)
+- ESP32 Development Boards (CP2102 recommended)
+- Raspberry Pi Touch Screen (optional)
+- M5Unit QRCode Scanner
+- Load cells, LEDs, sensors (see hardware specs below)
 
 ## 🔧 Installation Guide
 
 ### Step 1: System Preparation (Raspberry Pi)
-
 ```bash
 # Update system
 sudo apt update && sudo apt upgrade -y
 
 # Install required packages
-sudo apt install -y nodejs npm python3-pip git mosquitto mosquitto-clients
+sudo apt install -y nodejs npm python3-paho-mqtt python3-serial git mosquitto mosquitto-clients
 
 # Install PM2 globally for process management
 sudo npm install -g pm2
-
-# Install Python dependencies
-pip3 install paho-mqtt pyserial
 ```
 
 ### Step 2: Clone Repository
-
 ```bash
 # Navigate to installation directory
 cd /home/plasticlab
 
 # Clone the main repository
-git clone https://github.com/bareaescobar/WineFridge.git winefridge
-cd winefridge
+git clone https://github.com/bareaescobar/WineFridge.git
 
-# Clone frontend submodule (if separate)
-git submodule update --init --recursive
+# Navigate to project directory
+cd WineFridge
+
+# Initialize and clone the frontend submodule
+git submodule init
+git submodule update
+
+# Alternative: Clone submodule directly if not working
+cd RPI/frontend
+git clone https://github.com/bareaescobar/WineFridge_web.git
+
+# Verify submodule is properly cloned
+ls -la RPI/frontend/WineFridge_web/
 ```
 
 ### Step 3: Frontend Setup
-
 ```bash
 # Navigate to frontend directory
-cd frontend  # or wherever your web UI is located
+cd RPI/frontend/WineFridge_web
 
-# Install dependencies (using pnpm - recommended)
-pnpm install
-# OR using npm
+# Install dependencies using npm
 npm install
 ```
 
 ### Step 4: Backend Setup
-
-```bash
-# Create backend directory structure
-mkdir -p /home/plasticlab/winefridge/backend
-mkdir -p /home/plasticlab/winefridge/backend/database
-mkdir -p /home/plasticlab/winefridge/logs
-
-# Copy backend files (adjust paths as needed)
-cp RPI/backend/* /home/plasticlab/winefridge/backend/
-```
+The backend files are already included in the repository structure, no copying needed.
 
 ### Step 5: Configure Mosquitto MQTT Broker
-
-Create MQTT configuration file:
-
 ```bash
-# Create mosquitto config directory
-sudo mkdir -p /etc/mosquitto/conf.d
-
-# Create configuration file
-sudo tee /etc/mosquitto/conf.d/winefridge.conf << EOF
-# TCP listener for ESP32 devices
-listener 1883
-protocol mqtt
-
-# WebSocket listener for web interface
-listener 9001
-protocol websockets
-
-# Allow anonymous connections (adjust for production)
-allow_anonymous true
-
-# Logging
-log_dest file /var/log/mosquitto/mosquitto.log
-log_type all
-EOF
+# Copy the existing mosquitto configuration
+sudo cp ESP32_DrawerX/SWF_mosquitto.conf /etc/mosquitto/conf.d/
 
 # Create log directory
 sudo mkdir -p /var/log/mosquitto
@@ -130,142 +100,109 @@ sudo chown mosquitto:mosquitto /var/log/mosquitto
 # Enable and start mosquitto
 sudo systemctl enable mosquitto
 sudo systemctl start mosquitto
+
+# Verify mosquitto is running
+sudo systemctl status mosquitto
 ```
 
-### Step 6: System Services Setup
-
-Create systemd services for automatic startup:
+### Step 6: PM2 Process Management Setup
+The system uses PM2 for automatic process management. All configuration is already included in the repository.
 
 ```bash
-# Web server service
-sudo tee /etc/systemd/system/winefridge-web.service << EOF
-[Unit]
-Description=Wine Fridge Web Server
-After=network.target mosquitto.service
+# Navigate to backend directory
+cd RPI/backend
 
-[Service]
-Type=simple
-User=plasticlab
-WorkingDirectory=/home/plasticlab/winefridge/backend
-ExecStart=/usr/bin/node server.js
-Restart=always
-RestartSec=10
-Environment=NODE_ENV=production
+# Start all services using the existing PM2 configuration
+pm2 start pm2.config.js
 
-[Install]
-WantedBy=multi-user.target
-EOF
+# Save PM2 configuration for auto-restart on boot
+pm2 save
+pm2 startup
 
-# MQTT Handler service
-sudo tee /etc/systemd/system/winefridge-mqtt.service << EOF
-[Unit]
-Description=Wine Fridge MQTT Handler
-After=network.target mosquitto.service
-
-[Service]
-Type=simple
-User=plasticlab
-WorkingDirectory=/home/plasticlab/winefridge/backend
-ExecStart=/usr/bin/python3 mqtt_handler.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Barcode scanner service
-sudo tee /etc/systemd/system/winefridge-scanner.service << EOF
-[Unit]
-Description=Wine Fridge Barcode Scanner
-After=network.target
-
-[Service]
-Type=simple
-User=plasticlab
-WorkingDirectory=/home/plasticlab/winefridge/backend
-ExecStart=/usr/bin/python3 barcode_scanner.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Reload systemd and enable services
-sudo systemctl daemon-reload
-sudo systemctl enable winefridge-web
-sudo systemctl enable winefridge-mqtt
-sudo systemctl enable winefridge-scanner
+# Verify all services are running
+pm2 status
 ```
 
-## 🚀 Usage Instructions
-
-### Development Mode
-
-For development with hot-reload:
-
+If services fail to start:
 ```bash
-# Start frontend development server
-cd frontend
-pnpm dev
-# Access at http://localhost:5173
-
-# In another terminal, start backend services
-cd backend
+# Delete all PM2 processes and restart
+pm2 delete all
 pm2 start pm2.config.js
 ```
 
-### Production Mode
+## 🚀 PM2 Process Management
 
+### Essential PM2 Commands
 ```bash
-# Build frontend for production
-cd frontend
-pnpm build
+# View all running processes
+pm2 status
 
-# Copy built files to backend
-cp -r dist/* ../backend/public/
+# View detailed process information
+pm2 show <process-name>
 
-# Start all services
-sudo systemctl start mosquitto
-sudo systemctl start winefridge-web
-sudo systemctl start winefridge-mqtt
-sudo systemctl start winefridge-scanner
+# View logs for all processes
+pm2 logs
 
-# Access at http://localhost:3000 or Pi's IP address
+# View logs for specific process
+pm2 logs web-server
+pm2 logs mqtt-handler
+pm2 logs barcode-scanner
+
+# Stop all processes
+pm2 stop all
+
+# Stop specific process
+pm2 stop web-server
+
+# Restart all processes
+pm2 restart all
+
+# Restart specific process
+pm2 restart web-server
+
+# Delete all processes
+pm2 delete all
+
+# Delete specific process
+pm2 delete web-server
+
+# Monitor real-time process metrics
+pm2 monit
+
+# Reload processes with zero downtime
+pm2 reload all
 ```
 
-### After System Reboot
+### PM2 Configuration
+The system runs three main processes:
+- **web-server**: Node.js web server with WebSocket and MQTT bridge
+- **mqtt-handler**: Python MQTT message processor and system logic
+- **barcode-scanner**: Python barcode scanner interface
 
-All services should start automatically. To check status:
-
+### Auto-startup Configuration
 ```bash
-# Check service status
-sudo systemctl status winefridge-web
-sudo systemctl status winefridge-mqtt
-sudo systemctl status winefridge-scanner
-sudo systemctl status mosquitto
+# Save current process list
+pm2 save
 
-# View logs
-journalctl -u winefridge-web -f
-journalctl -u winefridge-mqtt -f
+# Generate startup script (run once)
+pm2 startup
+
+# Follow the instructions displayed to configure auto-startup
 ```
 
 ## 📡 MQTT Protocol
 
 ### Topic Structure
-
 Each component uses two topics:
 - `winefridge/{component}/command` → Component receives commands
 - `winefridge/{component}/status` → Component sends status updates
 
 ### Components
 - `drawer_1`, `drawer_2`, `drawer_3` (functional drawers)
-- `lighting` (display lighting controller)
+- `lighting` (display lighting controller)  
 - `system` (RPI/Web communication)
 
 ### Message Format
-
 All messages follow this structure:
 ```json
 {
@@ -280,7 +217,7 @@ All messages follow this structure:
 
 ### Example Commands
 
-**Bottle Loading:**
+#### Bottle Loading:
 ```bash
 # Test bottle scanning
 mosquitto_pub -h localhost -p 1883 -t 'winefridge/system/status' -m '{
@@ -307,80 +244,100 @@ mosquitto_pub -h localhost -p 1883 -t 'winefridge/system/status' -m '{
 ```
 
 ## 📁 Project Structure
-
 ```
-smart-wine-fridge/
-├── frontend/                    # Web UI (Vite + Vanilla JS)
-│   ├── src/
-│   │   ├── js/                 # JavaScript modules
-│   │   ├── styles/             # SCSS stylesheets
-│   │   ├── pages/              # HTML page templates
-│   │   └── assets/             # Images, fonts, icons
-│   ├── content/
-│   │   └── main.json           # Configuration data
-│   ├── package.json
-│   ├── vite.config.js
-│   └── .gitignore
+WineFridge/
+├── .gitignore
+├── .gitmodules
+├── README.md
+├── filestructure.txt
 │
-├── backend/                     # Raspberry Pi backend
-│   ├── server.js               # Web server (Node.js)
-│   ├── mqtt_handler.py         # Main control logic
-│   ├── barcode_scanner.py      # UART barcode reader
-│   ├── pm2.config.js           # Process management
-│   └── database/
-│       ├── inventory.json      # Current state
-│       └── wine-catalog.json   # Wine database
+├── ESP32_DrawerX/                    # ESP32 drawer controller code
+│   ├── ESP32_DrawerX.ino
+│   ├── PubSubClient_mod.h
+│   └── SWF_mosquitto.conf           # MQTT broker configuration
 │
-├── RPI/                        # Raspberry Pi specific files
-└── logs/                       # System logs
+├── ESP32_Lighting/                   # ESP32 lighting controller code
+│   └── ESP32_Lighting.ino
+│
+├── RPI/                             # Raspberry Pi backend system
+│   ├── backend/                     # Server and control logic
+│   │   ├── barcode_scanner.py       # UART barcode reader
+│   │   ├── mqtt_handler.py          # Main MQTT control logic  
+│   │   ├── pm2.config.js            # PM2 process configuration
+│   │   └── database/
+│   │       ├── inventory.json       # Current wine inventory
+│   │       └── wine-catalog.json    # Wine database
+│   │
+│   └── frontend/                    # Web interface
+│       └── WineFridge_web/          # Frontend submodule
+│           ├── package.json
+│           ├── vite.config.js
+│           ├── server.mjs           # Web server
+│           ├── content/
+│           │   └── main.json        # Configuration data
+│           └── src/
+│               ├── *.html           # Page templates
+│               ├── js/              # JavaScript modules
+│               │   ├── main.js
+│               │   ├── home.js
+│               │   ├── load-bottle.js
+│               │   ├── drawer.js
+│               │   └── helpers/
+│               │       └── helpers.js
+│               ├── styles/          # SCSS stylesheets
+│               │   ├── main.scss
+│               │   ├── variables.scss
+│               │   └── pages/
+│               ├── img/             # Images and icons
+│               ├── fonts/           # Typography
+│               └── partials/        # Reusable components
+│
+└── logs/                           # System logs
+    └── mqtt.log
 ```
 
 ## 🎨 Frontend Features
 
 ### Page Structure
-
 | Page | Description |
 |------|-------------|
-| `auth` | User authentication |
-| `forgot-password` | Password recovery |
-| `connect-fridge` | Initial setup |
-| `setup-fridge` | Configuration |
-| `home` | Main dashboard |
-| `account` | User profile |
-| `notifications` | Alert center |
-| `load-bottle` | Add wines |
-| `unload-bottle` | Remove wines |
-| `swap-bottle` | Move wines |
-| `drawer` | Drawer management |
-| `red-wines` | Red wine inventory |
-| `white-wines` | White wine inventory |
-| `rose-wines` | Rosé wine inventory |
+| auth | User authentication |
+| forgot-password | Password recovery |
+| connect-fridge | Initial setup |
+| setup-fridge | Configuration |
+| home | Main dashboard |
+| account | User profile |
+| notifications | Alert center |
+| load-bottle | Add wines |
+| unload-bottle | Remove wines |
+| swap-bottle | Move wines |
+| drawer | Drawer management |
+| drawer-red-wines | Red wine inventory |
+| drawer-white-wines | White wine inventory |
+| drawer-rose-wines | Rosé wine inventory |
 
 ### Technology Stack
-
 - **Build Tool**: Vite
 - **Styling**: SCSS with modern CSS features
 - **UI Components**: Swiper for carousels
-- **Templating**: Handlebars
 - **Code Formatting**: Prettier with pre-commit hooks
 
 ### Development Commands
-
 ```bash
 # Start development server
-pnpm dev
+npm run dev
 
-# Build for production
-pnpm build
+# Build for production  
+npm run build
 
 # Preview production build
-pnpm preview
+npm run preview
 
 # Format code
-pnpm format
+npm run format
 
 # Check formatting
-pnpm format:check
+npm run format:check
 ```
 
 ## 🔧 Hardware Configuration
@@ -395,11 +352,11 @@ pnpm format:check
 Each drawer includes:
 - Weight sensors (4x load cells + HX711)
 - Position detection switches (9x)
-- Front LED strips (WS2812B)
+- Front LED strips (WS2812B)  
 - Temperature/humidity sensor (SHT30-D)
 - Dual-color general lighting (COB LEDs)
 
-### Display Drawers (4-9)
+### Display Drawers (4-9)  
 - LED strips for visual display
 - General lighting only
 - No sensors (controlled by lighting ESP32)
@@ -408,7 +365,7 @@ Each drawer includes:
 
 ### Common Issues
 
-**MQTT Connection Failed:**
+#### MQTT Connection Failed:
 ```bash
 # Check mosquitto status
 sudo systemctl status mosquitto
@@ -417,58 +374,56 @@ sudo systemctl status mosquitto
 mosquitto_sub -h localhost -p 1883 -t "#" -v
 
 # Check configuration
-cat /etc/mosquitto/conf.d/winefridge.conf
+cat /etc/mosquitto/conf.d/SWF_mosquitto.conf
 ```
 
-**Web Server Not Starting:**
+#### Web Server Not Starting:
 ```bash
-# Check Node.js installation
-node --version
+# Check PM2 status
+pm2 status
 
-# Check service logs
-journalctl -u winefridge-web -f
+# Check specific service logs
+pm2 logs web-server
+
+# Restart web server
+pm2 restart web-server
 
 # Test manual start
-cd /home/plasticlab/winefridge/backend
-node server.js
+cd /home/plasticlab/WineFridge/RPI/frontend/WineFridge_web
+node server.mjs
 ```
 
-**Frontend Not Building:**
+#### Frontend Not Building:
 ```bash
 # Clear node modules and reinstall
+cd RPI/frontend/WineFridge_web
 rm -rf node_modules package-lock.json
-pnpm install
+npm install
 
 # Check for missing dependencies
-pnpm audit
+npm audit
+```
+
+#### PM2 Processes Not Starting:
+```bash
+# Check PM2 logs
+pm2 logs
+
+# Delete all and restart
+pm2 delete all
+pm2 start RPI/backend/pm2.config.js
+
+# Check Node.js and Python paths
+which node
+which python3
 ```
 
 ### Log Locations
-- **Web Server**: `journalctl -u winefridge-web`
-- **MQTT Handler**: `journalctl -u winefridge-mqtt`
+- **PM2 Processes**: `pm2 logs`
 - **Mosquitto**: `/var/log/mosquitto/mosquitto.log`
-- **System**: `/home/plasticlab/winefridge/logs/`
+- **System**: `/home/plasticlab/WineFridge/logs/`
+- **Web Server**: `pm2 logs web-server`
+- **MQTT Handler**: `pm2 logs mqtt-handler`
 
-## 🔒 Security Notes
-
-**Production Deployment:**
-- Change MQTT `allow_anonymous` to `false`
-- Set up MQTT user authentication
-- Configure firewall rules
-- Use HTTPS for web interface
-- Regular security updates
-
-## 📝 License
-
-This project is proprietary. See LICENSE file for details.
-
-## 📞 Support
-
-For issues and questions:
-- Create GitHub issue
-- Check troubleshooting section
-- Review system logs
-
----
-
-**Note**: This system requires careful hardware setup and configuration. Ensure all electrical connections are safe and follow proper IoT security practices.
+##
+Note: This system requires careful hardware setup and configuration. Ensure all electrical connections are safe and follow proper IoT security practices.
