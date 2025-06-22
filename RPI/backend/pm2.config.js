@@ -13,7 +13,7 @@ module.exports = {
     {
       name: 'web-server',
       cwd: '../frontend/WineFridge_web',
-      script: 'server.cjs'
+      script: './backend/server.cjs'
     },
     {
       name: 'kiosk',
