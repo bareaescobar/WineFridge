@@ -12,7 +12,7 @@ module.exports = {
     },
     {
       name: 'web-server',
-      cwd: '../frontend/WineFridge_web',
+      cwd: '../frontend/WineFridge_web/',
       script: './backend/server.cjs'
     },
     {
