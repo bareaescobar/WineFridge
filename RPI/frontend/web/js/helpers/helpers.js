@@ -1,6 +1,6 @@
 import Swiper from 'swiper'
 import 'swiper/css'
-import inventory from '../../../db/inventory.json'
+import inventory from '../../../../database/inventory.json'
 
 export function setCookie(cookieName, cookieValue) {
   let d = new Date()

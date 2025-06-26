@@ -2,7 +2,7 @@ import { BROKER_URL } from './constants/mqtt-variables'
 import { TOPICS } from './constants/topics'
 import { imgInputsHandler, favoriteHandler, handleMQTTMessage, updateBottleInfoModal } from './helpers/helpers'
 import { connectMQTT, publish, subscribe } from './mqttClient'
-import wineCatalog from '../../db/wine-catalog.json'
+import wineCatalog from '../../../database/wine-catalog.json'
 
 const loadBottleWelcomeModal = document.getElementById('load-bottle-welcome-modal')
 const scanBottleErrorModal = document.getElementById('scan-bottle-error-modal')

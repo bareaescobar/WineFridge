@@ -8,7 +8,7 @@ import {
 import { connectMQTT, publish, subscribe } from './mqttClient'
 import { TOPICS } from './constants/topics'
 import { BROKER_URL } from './constants/mqtt-variables'
-import wineCatalog from '../../db/wine-catalog.json'
+import wineCatalog from '../../../database/wine-catalog.json'
 
 const unloadBottleSuggestModal = document.getElementById('unload-bottle-suggest-modal')
 const unloadBottleManuallyModal = document.getElementById('unload-bottle-manually-modal')
