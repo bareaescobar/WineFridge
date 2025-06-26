@@ -1,0 +1,234 @@
+.account {
+  padding-top: 24px;
+  margin-bottom: auto;
+
+  &-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  &-title {
+    font-size: 32px;
+    line-height: 1.25;
+
+    @include tablet {
+      font-size: 36px;
+      line-height: 1.2;
+    }
+  }
+
+  &-email {
+    margin-top: 4px;
+    color: light-dark($grey-text-lightmode, $grey-text-darkmode);
+
+    @include tablet {
+      margin-top: 8px;
+      font-size: 20px;
+    }
+  }
+
+  &-links {
+    margin-top: 32px;
+    padding-top: 32px;
+    position: relative;
+    display: grid;
+    gap: 24px;
+
+    @include tablet {
+      margin-top: 40px;
+      padding-top: 40px;
+      gap: 32px;
+    }
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -24px;
+      right: -24px;
+      height: 1px;
+      background-color: light-dark($grey-border-lightmode, $grey-border-darkmode);
+
+      @include tablet {
+        left: -32px;
+        right: -32px;
+        height: 2px;
+      }
+    }
+  }
+}
+
+#account-modal {
+  .white-btn {
+    margin-top: auto;
+  }
+}
+
+.add-manager-form {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 24px;
+  width: 100%;
+  gap: 16px;
+
+  @include tablet {
+    padding-top: 32px;
+    gap: 24px;
+    font-size: 22px;
+  }
+
+  input {
+    border: 0;
+    font-size: inherit;
+    background-color: transparent;
+
+    &::placeholder {
+      color: light-dark($grey-text-lightmode, $grey-text-darkmode);
+    }
+  }
+
+  .btn {
+    flex-shrink: 0;
+  }
+}
+
+:is(#account-profile-delete-modal, #account-logout-modal) {
+  .modal-subtitle {
+    font-size: 13px;
+    line-height: 18px;
+    letter-spacing: -0.08px;
+    color: light-dark($text-color-lightmode, $text-color-darkmode);
+
+    @include tablet {
+      font-size: 18px;
+      line-height: 1.5;
+      letter-spacing: initial;
+    }
+  }
+}
+
+.managers-group {
+  margin-top: 32px;
+  padding-top: 32px;
+  position: relative;
+
+  @include tablet {
+    margin-top: 40px;
+    padding-top: 40px;
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -24px;
+    right: -24px;
+    height: 1px;
+    background-color: light-dark($grey-border-lightmode, $grey-border-darkmode);
+
+    @include tablet {
+      left: -32px;
+      right: -32px;
+      height: 2px;
+    }
+  }
+
+  &-label {
+    font-weight: 500;
+
+    @include tablet {
+      font-size: 20px;
+    }
+  }
+
+  &-list {
+    margin-top: 24px;
+
+    @include tablet {
+      margin-top: 32px;
+    }
+  }
+}
+
+.manager-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  &:not(:last-child) {
+    margin-bottom: 24px;
+
+    @include tablet {
+      margin-bottom: 32px;
+    }
+  }
+
+  &-photo {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    margin-right: 16px;
+    background-color: light-dark($grey-bg-lightmode, $grey-bg-darkmode);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    @include tablet {
+      width: 64px;
+      height: 64px;
+      margin-right: 24px;
+    }
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  &-name {
+    @include tablet {
+      font-size: 20px;
+    }
+  }
+  &-email {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.33;
+    color: light-dark($grey-text-lightmode, $grey-text-darkmode);
+
+    @include tablet {
+      margin-top: 8px;
+      font-size: 16px;
+      line-height: 1.2;
+    }
+  }
+
+  &-control {
+    margin-left: auto;
+    color: light-dark($grey-text-lightmode, $grey-text-darkmode);
+  }
+}
+
+#manager-delete-modal {
+  align-items: flex-end;
+  .modal-body {
+    background-color: transparent;
+    justify-content: flex-end;
+    padding: 24px 24px 40px;
+  }
+
+  .btn {
+    border-color: light-dark(#fff, #000);
+  }
+}
+
+#account-favorites-modal {
+  .search-group {
+    display: flex;
+  }
+}

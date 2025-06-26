@@ -1,0 +1,21 @@
+<svg width="310" height="156" viewBox="0 0 310 156" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M19 16C19 7.16344 26.1634 0 35 0H275C283.837 0 291 7.16344 291 16V140C291 148.837 283.837 156 275 156H35C26.1634 156 19 148.837 19 140V16Z" fill="white"/>
+<path d="M39 20H47V136H39V20Z" fill="#E7E7E7"/>
+<path d="M55 20H63V136H55V20Z" fill="#E7E7E7"/>
+<path d="M71 20H95V136H71V20Z" fill="#E7E7E7"/>
+<path d="M119 20H127V136H119V20Z" fill="#E7E7E7"/>
+<path d="M135 20H143V136H135V20Z" fill="#E7E7E7"/>
+<path d="M151 20H175V136H151V20Z" fill="#E7E7E7"/>
+<path d="M183 20H191V136H183V20Z" fill="#E7E7E7"/>
+<path d="M215 20H223V136H215V20Z" fill="#E7E7E7"/>
+<path d="M231 20H239V136H231V20Z" fill="#E7E7E7"/>
+<path d="M247 20H271V136H247V20Z" fill="#E7E7E7"/>
+<path d="M19 78H291V140C291 148.837 283.837 156 275 156H35C26.1634 156 19 148.837 19 140V78Z" fill="url(#paint0_linear_728_13221)"/>
+<path d="M0 78L310 78" stroke="black" stroke-width="4"/>
+<defs>
+<linearGradient id="paint0_linear_728_13221" x1="155" y1="156" x2="155" y2="78" gradientUnits="userSpaceOnUse">
+<stop stop-color="white" stop-opacity="0"/>
+<stop offset="1" stop-opacity="0.5"/>
+</linearGradient>
+</defs>
+</svg>

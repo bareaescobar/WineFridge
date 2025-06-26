@@ -6,8 +6,8 @@ from datetime import datetime
 import os
 
 # === File Paths ===
-INVENTORY_PATH = "backend/database/inventory.json"
-CATALOG_PATH = "backend/database/wine-catalog.json"
+INVENTORY_PATH = "../database/inventory.json"
+CATALOG_PATH = "../database/wine-catalog.json"
 LOG_PATH = "../logs/mqtt.log"
 
 class WineFridgeController:

@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Wine Fridge</title>
+
+    <link rel="stylesheet" href="styles/main.scss" />
+  </head>
+  <body>
+    <div id="app" style="opacity: 0">
+      <div class="modal rtl-modal active" id="account-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="left-group">
+              <a href="/" class="icon-btn grey-btn">
+                <svg class="icon">
+                  <use href="#icon-arrow-left"></use>
+                </svg>
+              </a>
+            </div>
+            <div class="right-group">
+              <button class="icon-btn grey-btn" data-target="account-profile-edit-modal">
+                <svg class="icon">
+                  <use href="#icon-pen-edit"></use>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="account">
+            <div class="account-head">
+              <div class="account-title">Ethan Clarke</div>
+              <div class="account-email">ethan.clarke@gmail.com</div>
+            </div>
+
+            <div class="account-links">
+              <button class="text-arrow-wide-btn" data-target="account-fridges-list-modal">
+                <span class="circle">
+                  <svg class="icon">
+                    <use href="#icon-snowflake"></use>
+                  </svg>
+                </span>
+                <span class="text"> Fridges </span>
+                <span class="annotation">3</span>
+              </button>
+
+              <button class="text-arrow-wide-btn" data-target="account-favorites-modal">
+                <span class="circle">
+                  <svg class="icon">
+                    <use href="#icon-heart"></use>
+                  </svg>
+                </span>
+                <span class="text"> Favorites </span>
+              </button>
+
+              <button class="text-arrow-wide-btn" data-target="account-notifications-settings-modal">
+                <span class="circle">
+                  <svg class="icon">
+                    <use href="#icon-bell"></use>
+                  </svg>
+                </span>
+                <span class="text"> Notifications </span>
+              </button>
+
+              <button class="text-arrow-wide-btn" data-target="account-access-control-modal">
+                <span class="circle">
+                  <svg class="icon">
+                    <use href="#icon-users"></use>
+                  </svg>
+                </span>
+                <span class="text"> Access Сontrol </span>
+              </button>
+
+              <button class="text-arrow-wide-btn" data-target="account-password-change-modal">
+                <span class="circle">
+                  <svg class="icon">
+                    <use href="#icon-lock-open"></use>
+                  </svg>
+                </span>
+                <span class="text"> Change Password </span>
+              </button>
+
+              <div class="text-arrow-wide-btn theme-group-btn">
+                <span class="circle">
+                  <svg class="icon">
+                    <use href="#icon-theme"></use>
+                  </svg>
+                </span>
+                <div class="text">Theme</div>
+
+                <div class="dropdown-group">
+                  <button class="icon-btn controls-dropdown-toggler-btn">
+                    <span class="text colormode-value-text"> </span>
+                    <svg class="icon">
+                      <use href="#icon-arrow-down"></use>
+                    </svg>
+                  </button>
+                  <div class="controls-dropdown">
+                    <button class="controls-dropdown-btn" data-colormode="light">
+                      <span>White</span>
+                    </button>
+                    <button class="controls-dropdown-btn" data-colormode="dark">
+                      <span>Dark</span>
+                    </button>
+                    <button class="controls-dropdown-btn" data-colormode="system">
+                      <span>System</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn logout-btn" data-target="account-logout-modal">Log Out</button>
+        </div>
+      </div>
+
+      <div class="modal rtl-modal" id="account-profile-edit-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="left-group">
+              <button class="icon-btn grey-btn modal-close">
+                <svg class="icon">
+                  <use href="#icon-arrow-left"></use>
+                </svg>
+              </button>
+            </div>
+            <div class="center-group">
+              <div class="modal-head-title">Edit Profile</div>
+            </div>
+          </div>
+
+          <div class="form">
+            <div class="input-wrapper">
+              <label for="user-name" class="input-label"> Full Name </label>
+              <input id="user-name" type="text" placeholder="Enter your name" value="Ethan Clarke" />
+            </div>
+            <div class="input-wrapper">
+              <label for="user-email" class="input-label"> Email </label>
+              <input id="user-email" type="text" placeholder="Enter new e-mail" value="ethan.clarke@gmail.com" />
+            </div>
+
+            <button class="text-btn alert-btn" data-target="account-profile-delete-modal">Delete Account</button>
+
+            <button class="btn modal-close">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal interaction-alert-modal" id="account-profile-delete-modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-body">
+          <div class="modal-title">Delete Account</div>
+          <div class="modal-subtitle">
+            Are you sure you want to delete <br />
+            account?
+          </div>
+          <div class="modal-controls">
+            <button class="modal-close">Cancel</button>
+            <a href="/auth" class="alert-btn">Yes, Delete</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal interaction-alert-modal" id="account-logout-modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-body">
+          <div class="modal-title">Log Out</div>
+          <div class="modal-subtitle">Are you sure you want to Log Out?</div>
+          <div class="modal-controls">
+            <button class="modal-close">Cancel</button>
+            <a href="/auth" class="alert-btn">Yes, Log Out</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal rtl-modal" id="account-password-change-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="left-group">
+              <button class="icon-btn grey-btn modal-close">
+                <svg class="icon">
+                  <use href="#icon-arrow-left"></use>
+                </svg>
+              </button>
+            </div>
+            <div class="center-group">
+              <div class="modal-head-title">Change Password</div>
+            </div>
+          </div>
+
+          <div class="form">
+            <div class="input-wrapper password-wrapper">
+              <label for="old-password" class="input-label"> Old Password </label>
+              <input id="old-password" type="password" placeholder="Enter your old password" />
+              <input type="text" placeholder="**********" required />
+              <button type="button" class="toggle-password-btn">
+                <svg class="icon"><use href="#icon-eyeslash"></use></svg>
+              </button>
+            </div>
+            <div class="input-wrapper password-wrapper">
+              <label for="new-password" class="input-label"> New Password </label>
+              <input id="new-password" type="password" placeholder="Enter new password" />
+              <input type="text" placeholder="**********" required />
+              <button type="button" class="toggle-password-btn">
+                <svg class="icon"><use href="#icon-eyeslash"></use></svg>
+              </button>
+            </div>
+            <div class="input-wrapper password-wrapper">
+              <label for="confirm-new-password" class="input-label"> Confirm New Password </label>
+              <input id="confirm-new-password" type="password" placeholder="Confirm new password" />
+              <input type="text" placeholder="**********" required />
+              <button type="button" class="toggle-password-btn">
+                <svg class="icon"><use href="#icon-eyeslash"></use></svg>
+              </button>
+            </div>
+
+            <button class="btn" data-target="account-password-success-modal">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal rtl-modal" id="account-notifications-settings-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="left-group">
+              <button class="icon-btn grey-btn modal-close">
+                <svg class="icon">
+                  <use href="#icon-arrow-left"></use>
+                </svg>
+              </button>
+            </div>
+            <div class="center-group">
+              <div class="modal-head-title">Notifications</div>
+            </div>
+          </div>
+
+          <div class="form">
+            <div class="checkboxes">
+              <div class="checkbox-wrapper">
+                <div class="checkbox-circle">
+                  <svg class="icon">
+                    <use href="#icon-bell"></use>
+                  </svg>
+                </div>
+                <div class="checkbox-text">Energy Saving Mode</div>
+                <label class="switcher">
+                  <input type="checkbox" name="" hidden checked />
+                  <span class="checkbox-box"></span>
+                </label>
+              </div>
+            </div>
+            <div class="checkboxes">
+              <div class="checkbox-wrapper">
+                <div class="checkbox-text">Temperature Fluctuations</div>
+                <label class="switcher">
+                  <input type="checkbox" name="" hidden />
+                  <span class="checkbox-box"></span>
+                </label>
+              </div>
+              <div class="checkbox-wrapper">
+                <div class="checkbox-text">Humidity Levels</div>
+                <label class="switcher">
+                  <input type="checkbox" name="" hidden checked />
+                  <span class="checkbox-box"></span>
+                </label>
+              </div>
+              <div class="checkbox-wrapper">
+                <div class="checkbox-text">Expiration Wine</div>
+                <label class="switcher">
+                  <input type="checkbox" name="" hidden />
+                  <span class="checkbox-box"></span>
+                </label>
+              </div>
+              <div class="checkbox-wrapper">
+                <div class="checkbox-text">Security & Lock</div>
+                <label class="switcher">
+                  <input type="checkbox" name="" hidden checked />
+                  <span class="checkbox-box"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal rtl-modal" id="account-access-control-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="left-group">
+              <button class="icon-btn grey-btn modal-close">
+                <svg class="icon">
+                  <use href="#icon-arrow-left"></use>
+                </svg>
+              </button>
+            </div>
+            <div class="center-group">
+              <div class="modal-head-title">Access Control</div>
+            </div>
+          </div>
+
+          <div class="add-manager-form">
+            <input type="email" placeholder="Enter email to add manager..." />
+            <button class="btn small-btn">Add</button>
+          </div>
+
+          <div class="managers-group">
+            <div class="managers-group-label">Managers</div>
+            <div class="managers-group-list">
+              <div class="manager-item">
+                <div class="manager-item-photo">
+                  <svg class="icon">
+                    <use href="#icon-user"></use>
+                  </svg>
+                </div>
+                <div class="manager-item-text">
+                  <div class="manager-item-name">Alex Jonson</div>
+                  <div class="manager-item-email">alex.johnson@gmail.com</div>
+                </div>
+                <button class="manager-item-control" data-target="manager-delete-modal">
+                  <svg class="icon">
+                    <use href="#icon-dots-more"></use>
+                  </svg>
+                </button>
+              </div>
+              <div class="manager-item">
+                <div class="manager-item-photo">
+                  <svg class="icon">
+                    <use href="#icon-user"></use>
+                  </svg>
+                </div>
+                <div class="manager-item-text">
+                  <div class="manager-item-name">Emily Carter</div>
+                  <div class="manager-item-email">emily.carter@gmail.com</div>
+                </div>
+                <button class="manager-item-control" data-target="manager-delete-modal">
+                  <svg class="icon">
+                    <use href="#icon-dots-more"></use>
+                  </svg>
+                </button>
+              </div>
+              <div class="manager-item">
+                <div class="manager-item-photo">
+                  <svg class="icon">
+                    <use href="#icon-user"></use>
+                  </svg>
+                </div>
+                <div class="manager-item-text">
+                  <div class="manager-item-name">Michael Brown</div>
+                  <div class="manager-item-email">michael.brown@gmail.com</div>
+                </div>
+                <button class="manager-item-control" data-target="manager-delete-modal">
+                  <svg class="icon">
+                    <use href="#icon-dots-more"></use>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal" id="manager-delete-modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-body">
+          <button class="btn white-btn alert-text-btn modal-close">Delete</button>
+        </div>
+      </div>
+
+      <div class="modal final-modal" id="account-password-success-modal">
+        <div class="modal-body">
+          <div class="state-group success">
+            <div class="state-group-icon">
+              <svg><use href="#icon-check"></use></svg>
+            </div>
+            <div class="state-group-title">
+              Password Successfully <br />
+              Changed!
+            </div>
+          </div>
+          <button class="btn modal-close">Go Back</button>
+        </div>
+      </div>
+
+      <div class="modal rtl-modal" id="account-favorites-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="left-group">
+              <button class="icon-btn grey-btn modal-close">
+                <svg class="icon">
+                  <use href="#icon-arrow-left"></use>
+                </svg>
+              </button>
+            </div>
+            <div class="center-group">
+              <div class="modal-head-title">Favorites</div>
+            </div>
+
+            <div class="right-group">
+              <div class="search-wrapper">
+                <button class="icon-btn grey-btn search-open-btn">
+                  <svg class="icon">
+                    <use href="#icon-search"></use>
+                  </svg>
+                </button>
+                <div class="search-form">
+                  <svg class="icon">
+                    <use href="#icon-search"></use>
+                  </svg>
+                  <input class="search-input" type="text" placeholder="Search" />
+                  <button class="icon-btn grey-btn search-close-btn">
+                    <svg class="icon">
+                      <use href="#icon-close"></use>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="favorites-list products-list">
+            <div class="product-item">
+              <div class="product-item-photo">
+                <img src="img/wine/Red/Bodegas Aragonesas-Solo-Syrah-Tirio.png" alt="" />
+              </div>
+              <div class="product-item-info">
+                <div class="product-item-title">Amberwood Merlot</div>
+                <div class="product-item-rating">4.7</div>
+                <div class="product-item-volume">400ml</div>
+              </div>
+            </div>
+            <div class="product-item">
+              <div class="product-item-photo">
+                <img src="img/wine/Red/Finca-del-Mar-Cabernet-Sauvignon-Crianza.png" alt="" />
+              </div>
+              <div class="product-item-info">
+                <div class="product-item-title">Velvet Noir Reserve</div>
+                <div class="product-item-rating">4.0</div>
+                <div class="product-item-volume">400ml</div>
+              </div>
+            </div>
+            <div class="product-item">
+              <div class="product-item-photo">
+                <img src="img/wine/Red/Hoya-De-Cadenas-Cabarnet-Suavignon-Crianza.png" alt="" />
+              </div>
+              <div class="product-item-info">
+                <div class="product-item-title">Golden Harvest</div>
+                <div class="product-item-rating">3.9</div>
+                <div class="product-item-volume">400ml</div>
+              </div>
+            </div>
+            <div class="product-item">
+              <div class="product-item-photo">
+                <img src="img/wine/Red/Laudium-Monastrell-Roble.png" alt="" />
+              </div>
+              <div class="product-item-info">
+                <div class="product-item-title">Midnight Syrah</div>
+                <div class="product-item-rating">4.1</div>
+                <div class="product-item-volume">400ml</div>
+              </div>
+            </div>
+            <div class="product-item">
+              <div class="product-item-photo">
+                <img src="img/wine/Red/Pata-Negra-Crianza.png" alt="" />
+              </div>
+              <div class="product-item-info">
+                <div class="product-item-title">Amberwood Merlot</div>
+                <div class="product-item-rating">4.7</div>
+                <div class="product-item-volume">400ml</div>
+              </div>
+            </div>
+            <div class="product-item">
+              <div class="product-item-photo">
+                <img src="img/wine/Rose/Alma-Atlantica-Rose.png" alt="" />
+              </div>
+              <div class="product-item-info">
+                <div class="product-item-title">Velvet Noir Reserve</div>
+                <div class="product-item-rating">4.7</div>
+                <div class="product-item-volume">400ml</div>
+              </div>
+            </div>
+            <div class="product-item">
+              <div class="product-item-photo">
+                <img src="img/wine/Rose/Castano-Rosado-Golosa-Frescura-Monastrell.png" alt="" />
+              </div>
+              <div class="product-item-info">
+                <div class="product-item-title">Amberwood Merlot</div>
+                <div class="product-item-rating">4.7</div>
+                <div class="product-item-volume">400ml</div>
+              </div>
+            </div>
+            <div class="product-item">
+              <div class="product-item-photo">
+                <img src="img/wine/Rose/Cune-Rosado.png" alt="" />
+              </div>
+              <div class="product-item-info">
+                <div class="product-item-title">Velvet Noir Reserve</div>
+                <div class="product-item-rating">4.0</div>
+                <div class="product-item-volume">400ml</div>
+              </div>
+            </div>
+            <div class="product-item">
+              <div class="product-item-photo">
+                <img src="img/wine/Rose/Granza-Organic-Rose-Cigales.png" alt="" />
+              </div>
+              <div class="product-item-info">
+                <div class="product-item-title">Golden Harvest</div>
+                <div class="product-item-rating">3.9</div>
+                <div class="product-item-volume">400ml</div>
+              </div>
+            </div>
+            <div class="product-item">
+              <div class="product-item-photo">
+                <img src="img/wine/Rose/Montecillo-Rose-Rioja.png" alt="" />
+              </div>
+              <div class="product-item-info">
+                <div class="product-item-title">Midnight Syrah</div>
+                <div class="product-item-rating">4.1</div>
+                <div class="product-item-volume">400ml</div>
+              </div>
+            </div>
+            <div class="product-item">
+              <div class="product-item-photo">
+                <img src="img/wine/White/Cuatro-Rayas-Cantarranas-Verdejo.png" alt="" />
+              </div>
+              <div class="product-item-info">
+                <div class="product-item-title">Amberwood Merlot</div>
+                <div class="product-item-rating">4.7</div>
+                <div class="product-item-volume">400ml</div>
+              </div>
+            </div>
+            <div class="product-item">
+              <div class="product-item-photo">
+                <img src="img/wine/White/Quatro-Rayas-Verdejo-Vendimia-Nocturna.png" alt="" />
+              </div>
+              <div class="product-item-info">
+                <div class="product-item-title">Velvet Noir Reserve</div>
+                <div class="product-item-rating">4.7</div>
+                <div class="product-item-volume">400ml</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal rtl-modal" id="account-fridges-list-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="left-group">
+              <button class="icon-btn grey-btn modal-close">
+                <svg class="icon">
+                  <use href="#icon-arrow-left"></use>
+                </svg>
+              </button>
+            </div>
+
+            <div class="center-group">
+              <div class="modal-head-title">My Fridges</div>
+            </div>
+
+            <div class="right-group">
+              <a href="/connect-fridge" class="icon-btn grey-btn">
+                <svg class="icon">
+                  <use href="#icon-plus"></use>
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          <div class="fridges-list">
+            <a href="/" class="fridge-item">
+              <div class="fridge-item-thumb">
+                <img src="img/fridge-thumb-1.png" alt="" />
+              </div>
+              <div class="fridge-item-info">
+                <div class="fridge-item-title">Kitchen Fridge</div>
+                <div class="fridge-item-model">Wine Enthusiast L26</div>
+              </div>
+            </a>
+            <a href="/" class="fridge-item">
+              <div class="fridge-item-thumb">
+                <img src="img/fridge-thumb-2.png" alt="" />
+              </div>
+              <div class="fridge-item-info">
+                <div class="fridge-item-title">Lounge Fridge</div>
+                <div class="fridge-item-model">WineSmart 360 Pro</div>
+              </div>
+            </a>
+            <a href="/" class="fridge-item">
+              <div class="fridge-item-thumb">
+                <img src="img/fridge-thumb-3.png" alt="" />
+              </div>
+              <div class="fridge-item-info">
+                <div class="fridge-item-title">Cellar Fridge</div>
+                <div class="fridge-item-model">Winobox 500</div>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <include src="web/partials/sprite.html"></include>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/account.js"></script>
+  </body>
+</html>

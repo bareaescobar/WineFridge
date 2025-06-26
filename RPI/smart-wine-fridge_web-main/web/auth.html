@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Wine Fridge</title>
+
+    <link rel="stylesheet" href="styles/main.scss" />
+  </head>
+  <body>
+    <div id="app" style="opacity: 0">
+      <div class="modal rtl-modal active" id="login-modal">
+        <div class="modal-body">
+          <div class="modal-head"></div>
+          <div class="modal-title">Sign In</div>
+          <div class="form">
+            <div class="input-wrapper">
+              <label for="user-full-name" class="input-label"> Full Name </label>
+              <input id="user-full-name" type="text" placeholder="Enter your full name" value="Ethan Clarke" required />
+            </div>
+            <div class="input-wrapper password-wrapper">
+              <label for="auth-password" class="input-label"> Password </label>
+              <input id="auth-password" type="password" placeholder="Enter your password" />
+              <input type="text" placeholder="**********" required />
+              <button type="button" class="toggle-password-btn">
+                <svg class="icon"><use href="#icon-eyeslash"></use></svg>
+              </button>
+            </div>
+
+            <a href="/forgot-password" class="forgot-password-btn"> Forgot Password? </a>
+          </div>
+
+          <a href="/" class="btn submit-btn">Sign In</a>
+
+          <div class="social-group">
+            <div class="social-group-label">Or</div>
+            <div class="social-group-btns">
+              <button class="btn white-btn grey-border">
+                <svg><use href="#icon-logo-apple"></use></svg>
+                <span>Sign In With Apple</span>
+              </button>
+              <button class="btn white-btn grey-border">
+                <svg><use href="#icon-logo-google"></use></svg>
+                <span>Sign In With Google</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="auth-bottom-annotation">
+            Don't have an account?
+            <span data-target="register-modal">Sign Up</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal rtl-modal" id="register-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="left-group">
+              <button class="icon-btn grey-btn modal-close">
+                <svg class="icon"><use href="#icon-arrow-left"></use></svg>
+              </button>
+            </div>
+          </div>
+          <div class="modal-title">Sign Up</div>
+
+          <div class="form">
+            <div class="input-wrapper">
+              <label for="user-full-name" class="input-label"> Full Name </label>
+              <input id="user-full-name" type="text" placeholder="Enter your full name" required />
+            </div>
+            <div class="input-wrapper">
+              <label for="user-email" class="input-label"> Email </label>
+              <input id="user-email" type="email" placeholder="Enter your e-mail" required />
+            </div>
+            <div class="input-wrapper password-wrapper">
+              <label for="register-password" class="input-label"> Password </label>
+              <input id="register-password" type="password" placeholder="Enter your password" />
+              <input type="text" placeholder="**********" required />
+              <button type="button" class="toggle-password-btn">
+                <svg class="icon"><use href="#icon-eyeslash"></use></svg>
+              </button>
+            </div>
+          </div>
+
+          <button class="btn submit-btn" data-target="register-verification-modal">Sign Up</button>
+
+          <div class="auth-bottom-annotation">
+            Already have an account?
+            <span class="modal-close">Sign In</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal rtl-modal" id="register-verification-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="left-group">
+              <button class="icon-btn grey-btn modal-close">
+                <svg class="icon"><use href="#icon-arrow-left"></use></svg>
+              </button>
+            </div>
+          </div>
+          <div class="modal-title">Verification</div>
+          <div class="modal-subtitle">
+            Please, enter verification code, that was sent to <span>ethan.clarke@gmail.com</span>
+          </div>
+          <div class="verification-group">
+            <input type="number" maxlength="1" />
+            <input type="number" maxlength="1" disabled />
+            <input type="number" maxlength="1" disabled />
+            <input type="number" maxlength="1" disabled />
+            <input type="number" maxlength="1" disabled />
+            <input type="number" maxlength="1" disabled />
+          </div>
+          <div class="auth-bottom-annotation">
+            Don't receive code?
+            <span>Resend Code</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal final-modal" id="register-success-modal">
+        <div class="modal-body">
+          <div class="state-group success">
+            <div class="state-group-icon">
+              <svg><use href="#icon-check"></use></svg>
+            </div>
+            <div class="state-group-title">
+              Account Successfully <br />
+              Created
+            </div>
+          </div>
+          <a href="/connect-fridge" class="btn">Continue</a>
+        </div>
+      </div>
+
+      <include src="web/partials/sprite.html"></include>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/auth.js"></script>
+  </body>
+</html>

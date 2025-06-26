@@ -3,17 +3,19 @@ module.exports = {
     {
       name: 'mqtt-handler',
       script: 'mqtt_handler.py',
-      interpreter: 'python3'
+      interpreter: 'python3',
+      cwd: './backend'
     },
     {
       name: 'barcode-scanner',
       script: 'barcode_scanner.py',
-      interpreter: 'python3'
+      interpreter: 'python3',
+      cwd: './backend'
     },
     {
       name: 'web-server',
-      cwd: '../frontend/WineFridge_web',
-      script: './backend/server.cjs'
+	    script: 'server.cjs',
+      cwd: './frontend/backend'
     },
     {
       name: 'kiosk',

@@ -1,0 +1,75 @@
+<template id="bottle-info-modal-template">
+  <div class="modal-body">
+    <div class="modal-head">
+      <div class="left-group">
+        <button class="icon-btn modal-close" data-target="load-bottle-welcome-modal">
+          <svg class="icon">
+            <use href="#icon-arrow-left"></use>
+          </svg>
+        </button>
+      </div>
+
+      <div class="right-group">
+        <button class="icon-btn favorite-btn">
+          <svg class="icon">
+            <use href="#icon-heart"></use>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="block-bottle-info">
+      <div class="bottle-head">
+        <div class="bottle-head-banner">
+          <img data-field="image_url" alt="" />
+        </div>
+        <div class="bottle-head-info">
+          <div class="bottle-title" data-field="name"></div>
+          <div class="bottle-subtitle" data-field="description"></div>
+          <div class="bottle-rating" data-field="avg_rating"></div>
+          <div class="bottle-volume" data-field="volume"></div>
+        </div>
+      </div>
+
+      <div class="bottle-body">
+        <div class="info-group">
+          <div class="info-group-title">Description</div>
+          <div class="info-group-content">
+            <p data-field="description"></p>
+          </div>
+        </div>
+        <div class="info-group">
+          <div class="info-group-title">Details</div>
+          <div class="info-group-content">
+            <div>
+              <div class="info-params">
+                <div class="param-item">
+                  <div class="param-item-value" data-field="vintage"></div>
+                  <div class="param-item-title">Year</div>
+                </div>
+                <div class="param-item">
+                  <div class="param-item-value" data-field="price"></div>
+                  <div class="param-item-title">Price Range</div>
+                </div>
+                <div class="param-item">
+                  <div class="param-item-value" data-field="alcohol"></div>
+                  <div class="param-item-title">Alcohol %</div>
+                </div>
+              </div>
+            </div>
+
+            <p><strong>Grapes:</strong><span data-field="grape"></span></p>
+            <p><b>Flavours:</b><span data-field="flavours"></span></p>
+            <p><strong>Food Pairing:</strong><span data-field="meal_type"></span></p>
+            <p><b>Region:</b><span data-field="region_country"></span></p>
+            <p><strong>About the Winery:</strong><span data-field="about_winery"></span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btns">
+      <div class="btn modal-close" data-target="load-bottle-drawer-modal">Confirm & Load Bottle</div>
+    </div>
+  </div>
+</template>
