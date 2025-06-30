@@ -1,6 +1,6 @@
 /*
  * WineFridge Drawer ESP32 - Combined Best Version
- * Combines simplicity of v2.1 with robustness of v10 ---> 13.36h - 30.06.2025
+ * Claude V18 - 14:19h -- 30.06.2025
  * Simple, efficient, but with good debugging capabilities
  */
 
@@ -29,21 +29,38 @@
 
 // ==================== PIN DEFINITIONS ====================
 // Position Detection Switches (Normally Open, using internal pullup)
+// Positions follow zigzag pattern: front-back-front-back...
 const uint8_t SWITCH_PINS[9] = {
-    4,   // Position 1 - GPIO4
-    5,   // Position 2 - GPIO5  
-    23,  // Position 3 - GPIO23
-    14,  // Position 4 - GPIO14
-    27,  // Position 5 - GPIO27
-    26,  // Position 6 - GPIO26
-    12,  // Position 7 - GPIO12
-    33,  // Position 8 - GPIO33
-    32   // Position 9 - GPIO32
+    4,   // Position 1 - Front left
+    5,   // Position 2 - Back left
+    23,  // Position 3 - Front second
+    14,  // Position 4 - Back second
+    27,  // Position 5 - Front middle
+    26,  // Position 6 - Back third
+    12,  // Position 7 - Front fourth
+    33,  // Position 8 - Back right
+    32   // Position 9 - Front right
 };
+
+// LED indexes for each position (WS2812 strip has 33 LEDs total)
+// Only these 9 LEDs are used for bottle positions, rest stay off
+const uint8_t bottleToLed[9] = {
+    32,  // Position 1 LED (Front left)
+    28,  // Position 2 LED (Back left)  
+    24,  // Position 3 LED (Front second)
+    20,  // Position 4 LED (Back second)
+    16,  // Position 5 LED (Front middle)
+    12,  // Position 6 LED (Back third)
+    8,   // Position 7 LED (Front fourth)
+    4,   // Position 8 LED (Back right)
+    0    // Position 9 LED (Front right)
+};
+
+// TODO: Future general illumination could use the remaining 24 LEDs
 
 // LED Control
 #define WS2812_DATA_PIN 13
-#define NUM_LEDS 9
+#define NUM_LEDS 33  // Total LEDs in WS2812 strip (only 9 used for positions)
 
 // ==================== LED COLOR DEFINITIONS ====================
 #define COLOR_AVAILABLE   0x0000FF  // Blue - position available
@@ -424,21 +441,22 @@ void checkPositionChanges() {
 void setPositionLED(uint8_t position, uint32_t color, uint8_t brightness) {
   if (position < 1 || position > 9) return;
   
-  uint8_t index = position - 1; // Convert to 0-based index
+  // Use zigzag mapping: position → LED index
+  uint8_t ledIndex = bottleToLed[position - 1];
   
   // Apply brightness scaling
   uint8_t r = ((color >> 16) & 0xFF) * brightness / 255;
   uint8_t g = ((color >> 8) & 0xFF) * brightness / 255;
   uint8_t b = (color & 0xFF) * brightness / 255;
   
-  strip.setPixelColor(index, r, g, b);
+  strip.setPixelColor(ledIndex, r, g, b);
   strip.show();
 }
 
 void testLEDsOnStartup() {
-  Serial.print("Testing LEDs");
+  Serial.print("Testing position LEDs (zigzag mapping)");
   
-  // Light up each position briefly
+  // Light up each position LED briefly to show mapping
   for (int i = 1; i <= 9; i++) {
     setPositionLED(i, COLOR_AVAILABLE, 100);
     delay(100);
@@ -447,35 +465,40 @@ void testLEDsOnStartup() {
   
   delay(500);
   
-  // Turn all off
+  // Turn all off (clears entire strip)
   strip.clear();
   strip.show();
   Serial.println(" done");
 }
 
 void testAllLEDs() {
-  // Cycle through colors for debugging
-  Serial.println("LED test: Red");
+  // Cycle through colors for debugging (only position LEDs)
+  Serial.println("LED test: Red (positions only)");
   for (int i = 1; i <= 9; i++) {
     setPositionLED(i, COLOR_ERROR, 100);
+    delay(100); // Brief delay to see sequence
   }
   delay(1000);
   
-  Serial.println("LED test: Green");
+  Serial.println("LED test: Green (positions only)");
   for (int i = 1; i <= 9; i++) {
     setPositionLED(i, COLOR_SUCCESS, 100);
+    delay(100);
   }
   delay(1000);
   
-  Serial.println("LED test: Blue");
+  Serial.println("LED test: Blue (positions only)");
   for (int i = 1; i <= 9; i++) {
     setPositionLED(i, COLOR_AVAILABLE, 100);
+    delay(100);
   }
   delay(1000);
   
-  Serial.println("LED test: Off");
-  strip.clear();
+  Serial.println("LED test: Off (clearing all)");
+  strip.clear(); // This clears all 33 LEDs
   strip.show();
+  
+  Serial.println("LED test complete - only position LEDs used");
 }
 
 // ==================== MQTT PUBLISHING ====================
@@ -557,6 +580,9 @@ void handleSerialCommands() {
     else if (cmd == "POSITIONS") {
       readAllPositions();
     }
+    else if (cmd == "MAPPING") {
+      printLEDMapping();
+    }
     else if (cmd == "PING") {
       connectMQTT();
     }
@@ -607,6 +633,19 @@ void handleLEDCommand(String cmd) {
   }
 }
 
+void printLEDMapping() {
+  Serial.println("\n=== LED POSITION MAPPING ===");
+  Serial.println("Position → LED Index (Zigzag)");
+  for (int i = 0; i < 9; i++) {
+    Serial.print("Position ");
+    Serial.print(i + 1);
+    Serial.print(" → LED ");
+    Serial.println(bottleToLed[i]);
+  }
+  Serial.println("Total LEDs: 33 (24 unused)");
+  Serial.println("============================\n");
+}
+
 void printStatus() {
   Serial.println("\n=== DRAWER STATUS ===");
   Serial.print("ID: ");
@@ -643,6 +682,7 @@ void printHelp() {
   Serial.println("HEARTBEAT  - Send heartbeat now");
   Serial.println("TEST       - Test all LEDs");
   Serial.println("POSITIONS  - Read all positions");
+  Serial.println("MAPPING    - Show LED position mapping");
   Serial.println("PING       - Reconnect MQTT");
   Serial.println("WIFI       - Reconnect WiFi");
   Serial.println("LED 3 BLUE - Set position 3 blue");
