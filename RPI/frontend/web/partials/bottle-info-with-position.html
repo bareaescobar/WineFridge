@@ -1,0 +1,79 @@
+<template id="bottle-info-modal-template-with-position">
+  <div class="bottle-head">
+    <div class="bottle-head-banner">
+      <img data-field="image_url" src="" alt="" />
+    </div>
+    <div class="bottle-head-info">
+      <div class="bottle-title" data-field="name"></div>
+      <div class="bottle-subtitle" data-field="description"></div>
+      <div class="bottle-rating" data-field="avg_rating"></div>
+      <div class="bottle-volume" data-field="volume"></div>
+    </div>
+  </div>
+
+  <div class="bottle-body">
+    <div class="info-group">
+      <div class="info-group-title">Fridge Placement</div>
+      <div class="info-group-content">
+        <div class="info-params">
+          <div class="param-item">
+            <div class="param-item-value" data-field="zone"></div>
+            <div class="param-item-title">Zone</div>
+          </div>
+          <div class="param-item">
+            <div class="param-item-value" data-field="drawer"></div>
+            <div class="param-item-title">Drawer</div>
+          </div>
+          <div class="param-item">
+            <div class="drawer-position red-wine">
+              <svg width="139" height="52" viewBox="0 0 139 52" fill="none">
+                <ellipse cx="27.353" cy="12.6176" rx="12.6176" ry="12.6176" />
+                <ellipse cx="55.6459" cy="12.6176" rx="12.6176" ry="12.6176" />
+                <ellipse cx="83.9409" cy="12.6176" rx="12.6176" ry="12.6176" />
+                <ellipse cx="112.235" cy="12.6176" rx="12.6176" ry="12.6176" />
+                <ellipse cx="13.2055" cy="39.3825" rx="12.6176" ry="12.6176" />
+                <ellipse cx="41.4983" cy="39.3825" rx="12.6176" ry="12.6176" />
+                <ellipse cx="69.7934" cy="39.3825" rx="12.6176" ry="12.6176" />
+                <ellipse cx="98.0873" cy="39.3825" rx="12.6176" ry="12.6176" />
+                <ellipse cx="126.382" cy="39.3825" rx="12.6176" ry="12.6176" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-group">
+      <div class="info-group-title">Description</div>
+      <div class="info-group-content">
+        <p data-field="description"></p>
+      </div>
+    </div>
+
+    <div class="info-group">
+      <div class="info-group-title">Details</div>
+      <div class="info-group-content">
+        <div class="info-params">
+          <div class="param-item">
+            <div class="param-item-value" data-field="vintage"></div>
+            <div class="param-item-title">Year</div>
+          </div>
+          <div class="param-item">
+            <div class="param-item-value" data-field="price"></div>
+            <div class="param-item-title">Price Range</div>
+          </div>
+          <div class="param-item">
+            <div class="param-item-value" data-field="alcohol"></div>
+            <div class="param-item-title">Alcohol %</div>
+          </div>
+        </div>
+
+        <p><strong>Grapes:</strong> <span data-field="grape"></span></p>
+        <p><b>Flavours:</b> <span data-field="flavours"></span></p>
+        <p><strong>Food Pairing:</strong> <span data-field="meal_type"></span></p>
+        <p><b>Region:</b> <span data-field="region_country"></span></p>
+        <p><strong>About the Winery:</strong> <span data-field="about_winery"></span></p>
+      </div>
+    </div>
+  </div>
+</template>

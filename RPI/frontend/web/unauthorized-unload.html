@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Wine Fridge</title>
+
+    <link rel="stylesheet" href="styles/main.scss" />
+  </head>
+  <body>
+    <div id="app" style="opacity: 0">
+      <div class="modal rtl-modal active" id="unauthorized-unload-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="right-group">
+              <button class="icon-btn grey-btn">
+                <svg class="icon"><use href="#icon-lock-open"></use></svg>
+              </button>
+            </div>
+          </div>
+          <div class="modal-title text-center">
+            You Have Taken <br />
+            the <strong></strong> <span></span> Out
+          </div>
+
+          <div class="taken-products">
+            <div class="taken-products-inner"></div>
+          </div>
+
+          <div class="counter text-center">
+            <div class="counter-numbers">
+              <!-- 59 -->
+            </div>
+            <div class="counter-annotation">
+              Seconds Remaining Until Bottle <br />
+              Take Out Confirmation.
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- same as #take-bottle-success-modal -->
+      <div class="modal final-modal" id="unauthorized-unload-success-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="right-group">
+              <button class="icon-btn grey-btn">
+                <svg class="icon"><use href="#icon-lock-open"></use></svg>
+              </button>
+            </div>
+          </div>
+          <div class="modal-title text-center">
+            Take Wine Out <br />
+            Successful
+          </div>
+          <div class="state-group big success">
+            <div class="state-group-icon">
+              <svg><use href="#icon-check"></use></svg>
+            </div>
+          </div>
+
+          <div class="btns">
+            <button class="btn white-btn" data-target="unload-bottle-welcome-modal">Take Wine More</button>
+            <a href="/" class="btn">Go Back</a>
+          </div>
+        </div>
+      </div>
+
+      <include src="web/partials/sprite.html"></include>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/unauthorized-unload.js"></script>
+  </body>
+</html>
