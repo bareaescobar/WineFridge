@@ -1,0 +1,223 @@
+/home/plasticlab/NEW_REPO/WineFridge
+├── ESP32_DrawerX
+│   ├── ESP32_DrawerX.ino
+│   ├── PubSubClient_mod.h
+│   └── SWF_mosquitto.conf
+├── ESP32_Lighting
+│   └── ESP32_Lighting.ino
+├── filestructure_24.06.2025.txt
+├── filestructure_30.06.2025.txt
+├── .gitignore
+├── OLD
+│   ├── DISPLAY
+│   │   └── ESP32_DISPLAY_TEST_v1_5
+│   │       ├── BottleManager.cpp
+│   │       ├── BottleManager.h
+│   │       ├── CommunicationManager.cpp
+│   │       ├── CommunicationManager.h
+│   │       ├── config.h
+│   │       ├── DataStructures.h
+│   │       ├── DisplayManager.cpp
+│   │       ├── DisplayManager.h
+│   │       ├── ESP32_DISPLAY_TEST_v1_5.ino
+│   │       ├── gfx_conf.cpp
+│   │       └── gfx_conf.h
+│   └── SHELF
+│       └── WineFridge_v6.2_mejoraESPNOW
+│           ├── BottleDatabase.h
+│           ├── ButtonFunctions.h
+│           ├── Config.h
+│           ├── ESPNowFunctions.h
+│           ├── HardwareSetup.h
+│           ├── LedFunctions.h
+│           ├── MenuFunctions.h
+│           ├── SensorFunctions.h
+│           ├── UtilityFunctions.h
+│           ├── WineCatalog.h
+│           └── WineFridge_v6.2_mejoraESPNOW.ino
+├── README.md
+└── RPI
+    ├── backend
+    │   ├── barcode_scanner.py
+    │   ├── barcode_test
+    │   │   ├── barcode_scanner_original.py
+    │   │   └── find_scanner_port.py
+    │   └── mqtt_handler.py
+    ├── database
+    │   ├── inventory.json
+    │   └── wine-catalog.json
+    ├── frontend
+    │   ├── backend
+    │   │   ├── db-routes.cjs
+    │   │   └── server.cjs
+    │   ├── .gitignore
+    │   ├── .husky
+    │   │   └── pre-commit
+    │   ├── package.json
+    │   ├── .prettierignore
+    │   ├── .prettierrc
+    │   ├── README.md
+    │   ├── vite.config.js
+    │   └── web
+    │       ├── account.html
+    │       ├── auth.html
+    │       ├── connect-fridge.html
+    │       ├── content
+    │       │   └── inventory.json
+    │       ├── drawer-red-wines.html
+    │       ├── drawer-rose-wines.html
+    │       ├── drawer-white-wines.html
+    │       ├── fonts
+    │       │   ├── SFUIDisplay-Medium.woff2
+    │       │   ├── SFUIDisplay-Regular.woff2
+    │       │   └── SFUIDisplay-Semibold.woff2
+    │       ├── forgot-password.html
+    │       ├── img
+    │       │   ├── fridge
+    │       │   │   ├── fridge-1.png
+    │       │   │   ├── fridge-thumb-1.png
+    │       │   │   ├── fridge-thumb-2.png
+    │       │   │   └── fridge-thumb-3.png
+    │       │   ├── scanner-empty.jpg
+    │       │   ├── scanner-full.jpg
+    │       │   ├── suggest
+    │       │   │   ├── suggest_10-3x.jpg
+    │       │   │   ├── suggest_11-3x.jpg
+    │       │   │   ├── suggest_12-3x.jpg
+    │       │   │   ├── suggest_13-3x.png
+    │       │   │   ├── suggest_1-3x.jpg
+    │       │   │   ├── suggest_14-3x.png
+    │       │   │   ├── suggest_2-3x.jpg
+    │       │   │   ├── suggest_3-3x.jpg
+    │       │   │   ├── suggest_4-3x.jpg
+    │       │   │   ├── suggest_5-3x.jpg
+    │       │   │   ├── suggest_6-3x.jpg
+    │       │   │   ├── suggest_7-3x.jpg
+    │       │   │   ├── suggest_8-3x.jpg
+    │       │   │   └── suggest_9-3x.jpg
+    │       │   ├── svg
+    │       │   │   ├── barcode.svg
+    │       │   │   ├── fridge-figure.svg
+    │       │   │   ├── red-wine-bottle.svg
+    │       │   │   ├── rose-wine-bottle.svg
+    │       │   │   └── white-wine-bottle.svg
+    │       │   ├── unload-category-manually-banner-2x.jpg
+    │       │   ├── unload-category-suggest-banner-2x.jpg
+    │       │   └── wine
+    │       │       ├── Red
+    │       │       │   ├── Bodegas Aragonesas-Solo-Syrah-Tirio-info-banner-2x.png
+    │       │       │   ├── Bodegas Aragonesas-Solo-Syrah-Tirio.png
+    │       │       │   ├── Finca-del-Mar-Cabernet-Sauvignon-Crianza-info-banner-2x.png
+    │       │       │   ├── Finca-del-Mar-Cabernet-Sauvignon-Crianza.png
+    │       │       │   ├── Hoya-De-Cadenas-Cabarnet-Suavignon-Crianza-info-banner-2x.png
+    │       │       │   ├── Hoya-De-Cadenas-Cabarnet-Suavignon-Crianza.png
+    │       │       │   ├── Laudium-Monastrell-Roble-info-banner-2x.png
+    │       │       │   ├── Laudium-Monastrell-Roble.png
+    │       │       │   ├── MonteSierra-Young-info-banner-2x.png
+    │       │       │   ├── MonteSierra-Young.png
+    │       │       │   ├── Pata-Negra-Crianza-info-banner-2x.png
+    │       │       │   ├── Pata-Negra-Crianza.png
+    │       │       │   ├── Señorío-de-los-Llanos-Reserva-info-banner-2x.png
+    │       │       │   ├── Señorío-de-los-Llanos-Reserva.png
+    │       │       │   ├── Silanus-Young-Red-info-banner-2x.png
+    │       │       │   ├── Silanus-Young-Red.png
+    │       │       │   ├── Viña-Cumbrero-Crianza-info-banner-2x.png
+    │       │       │   └── Viña-Cumbrero-Crianza.png
+    │       │       ├── Rose
+    │       │       │   ├── Alma-Atlantica-Rose-info-banner-2x.png
+    │       │       │   ├── Alma-Atlantica-Rose.png
+    │       │       │   ├── Castano-Rosado-Golosa-Frescura-Monastrell-info-banner-2x.png
+    │       │       │   ├── Castano-Rosado-Golosa-Frescura-Monastrell.png
+    │       │       │   ├── Cune-Rosado-info-banner-2x.png
+    │       │       │   ├── Cune-Rosado.png
+    │       │       │   ├── Fidencio-Rosado-info-banner-2x.png
+    │       │       │   ├── Fidencio-Rosado.png
+    │       │       │   ├── Granza-Organic-Rose-Cigales-info-banner-2x.png
+    │       │       │   ├── Granza-Organic-Rose-Cigales.png
+    │       │       │   ├── Montecillo-Rose-Rioja-info-banner-2x.png
+    │       │       │   ├── Montecillo-Rose-Rioja.png
+    │       │       │   ├── Protos-Clarete-Rose-info-banner-2x.png
+    │       │       │   ├── Protos-Clarete-Rose.png
+    │       │       │   ├── Torres-Viña-Esmeralda-Rose-info-banner-2x.png
+    │       │       │   ├── Torres-Viña-Esmeralda-Rose.png
+    │       │       │   ├── Viña-Pomal-Rosado-info-banner-2x.png
+    │       │       │   └── Viña-Pomal-Rosado.png
+    │       │       ├── Spicy_Ethnic_Cuisine_Banner.png
+    │       │       ├── Vegetarian_Banner_2.png
+    │       │       └── White
+    │       │           ├── Cuatro-Rayas-Cantarranas-Verdejo-info-banner-2x.png
+    │       │           ├── Cuatro-Rayas-Cantarranas-Verdejo.png
+    │       │           ├── CUATRO-RAYAS-Pampano-Organic-Afrutado-Verdejo-info-banner-2x.png
+    │       │           ├── CUATRO-RAYAS-Pampano-Organic-Afrutado-Verdejo.png
+    │       │           ├── Finca-del-Mar-Verdejo-info-banner-2x.png
+    │       │           ├── Finca-del-Mar-Verdejo.png
+    │       │           ├── Hoya-De-Cadenas-Chardonnay-Sauvingon-Blanc-info-banner-2x.png
+    │       │           ├── Hoya-De-Cadenas-Chardonnay-Sauvingon-Blanc.png
+    │       │           ├── Pago-del-Cielo-Celeste-Verdejo-info-banner-2x.png
+    │       │           ├── Pago-del-Cielo-Celeste-Verdejo.png
+    │       │           ├── Quatro-Rayas-Verdejo-Vendimia-Nocturna-info-banner-2x.png
+    │       │           ├── Quatro-Rayas-Verdejo-Vendimia-Nocturna.png
+    │       │           ├── Ramon-Bilbao-Verdejo-info-banner-2x.png
+    │       │           ├── Ramon-Bilbao-Verdejo.png
+    │       │           ├── Señorio-de-Los-Llanos-Verdejo-info-banner-2x.png
+    │       │           ├── Señorio-de-Los-Llanos-Verdejo.png
+    │       │           ├── Veliterra-Rueda-Verdejo-info-banner-2x.png
+    │       │           └── Veliterra-Rueda-Verdejo.png
+    │       ├── index.html
+    │       ├── index-old.html
+    │       ├── js
+    │       │   ├── account.js
+    │       │   ├── auth.js
+    │       │   ├── connect-fridge.js
+    │       │   ├── constants
+    │       │   │   ├── mqtt-variables.js
+    │       │   │   └── topics.js
+    │       │   ├── drawer.js
+    │       │   ├── forgot-password.js
+    │       │   ├── helpers
+    │       │   │   └── helpers.js
+    │       │   ├── home.js
+    │       │   ├── load-bottle.js
+    │       │   ├── main.js
+    │       │   ├── main-old.js
+    │       │   ├── mqttClient.js
+    │       │   ├── notifications.js
+    │       │   ├── setup-fridge.js
+    │       │   ├── swap-bottle.js
+    │       │   ├── unauthorized-unload.js
+    │       │   └── unload-bottle.js
+    │       ├── load-bottle.html
+    │       ├── notifications.html
+    │       ├── partials
+    │       │   ├── bottle-info.html
+    │       │   ├── bottle-info-with-position.html
+    │       │   ├── product-template.html
+    │       │   ├── sprite.html
+    │       │   └── temperature-guide-modal.html
+    │       ├── routes.html
+    │       ├── setup-fridge.html
+    │       ├── styles
+    │       │   ├── blocks.scss
+    │       │   ├── fonts.scss
+    │       │   ├── general.scss
+    │       │   ├── main.scss
+    │       │   ├── mixins.scss
+    │       │   ├── modal.scss
+    │       │   ├── pages
+    │       │   │   ├── account.scss
+    │       │   │   ├── connect-fridge.scss
+    │       │   │   ├── drawer.scss
+    │       │   │   ├── fridge.scss
+    │       │   │   ├── notifications.scss
+    │       │   │   ├── setup-fridge.scss
+    │       │   │   └── unload-bottle.scss
+    │       │   ├── reusable-ui.scss
+    │       │   └── variables.scss
+    │       ├── swap-bottle.html
+    │       ├── unauthorized-unload.html
+    │       └── unload-bottle.html
+    ├── logs
+    │   └── mqtt.log
+    └── pm2.config.js
+
+33 directories, 188 files
