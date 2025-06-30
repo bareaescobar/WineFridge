@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Wine Fridge</title>
+
+    <link rel="stylesheet" href="styles/main.scss" />
+  </head>
+  <body>
+    <div id="app" style="opacity: 0">
+      <div class="modal rtl-modal active" id="swap-bottles-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="left-group">
+              <a href="/" class="icon-btn grey-btn">
+                <svg class="icon"><use href="#icon-arrow-left"></use></svg>
+              </a>
+            </div>
+            <div class="right-group">
+              <button class="icon-btn grey-btn">
+                <svg class="icon"><use href="#icon-lock-open"></use></svg>
+              </button>
+            </div>
+          </div>
+          <div class="modal-title text-center">
+            Take Bottles <br />
+            And Swap Them
+          </div>
+
+          <div class="swap-group">
+            <div class="bottle-placeholder">
+              <div class="placeholder-text active">
+                Take the Bottle You <br />
+                Want to Swap
+              </div>
+
+              <div class="product-item">
+                <div class="product-item-photo">
+                  <img src="img/wine/Red/Bodegas Aragonesas-Solo-Syrah-Tirio.png" alt="" />
+                </div>
+                <div class="product-item-info">
+                  <div class="product-item-title">Amberwood Merlot</div>
+                  <div class="product-item-rating">4.7</div>
+                  <div class="product-item-volume">400ml</div>
+                </div>
+              </div>
+            </div>
+            <div class="divider">
+              <span>
+                <svg class="icon"><use href="#icon-sort"></use></svg>
+              </span>
+            </div>
+            <div class="bottle-placeholder">
+              <div class="placeholder-text active">
+                Take the Bottle You <br />
+                Want to Swap
+              </div>
+              <div class="product-item">
+                <div class="product-item-photo">
+                  <img src="img/wine/Red/Finca-del-Mar-Cabernet-Sauvignon-Crianza.png" alt="" />
+                </div>
+                <div class="product-item-info">
+                  <div class="product-item-title">Velvet Noir Reserve</div>
+                  <div class="product-item-rating">4.0</div>
+                  <div class="product-item-volume">400ml</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal final-modal" id="swap-bottles-success-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="right-group">
+              <button class="icon-btn grey-btn">
+                <svg class="icon"><use href="#icon-lock-open"></use></svg>
+              </button>
+            </div>
+          </div>
+          <div class="modal-title text-center">
+            Wines Swapped <br />
+            Successfully
+          </div>
+          <div class="state-group big success">
+            <div class="state-group-icon">
+              <svg><use href="#icon-check"></use></svg>
+            </div>
+          </div>
+
+          <div class="btns">
+            <button class="btn white-btn" data-target="swap-bottles-modal">Swap More</button>
+            <a href="/" class="btn">Go Back</a>
+          </div>
+        </div>
+      </div>
+
+      <include src="web/partials/sprite.html"></include>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/swap-bottle.js"></script>
+  </body>
+</html>

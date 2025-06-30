@@ -1,0 +1,122 @@
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+}
+
+html {
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  text-size-adjust: 100%;
+  height: 100%;
+  scroll-behavior: smooth;
+  color-scheme: light dark;
+}
+
+body {
+  font-family: $main-font, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+
+  @include tablet {
+    font-size: 18px;
+  }
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: $duration;
+  &:hover {
+    cursor: pointer;
+    text-decoration: none;
+  }
+  &:active,
+  &:focus {
+    outline: 0;
+  }
+}
+
+p {
+  margin-bottom: 0;
+}
+
+img {
+  display: block;
+}
+button {
+  border: 0;
+  background-color: transparent;
+  padding: 0;
+  cursor: pointer;
+  font-size: inherit;
+  color: inherit;
+  display: block;
+  &:hover {
+    cursor: pointer;
+  }
+  &:active,
+  &:focus {
+    outline: 0;
+  }
+}
+
+svg {
+  display: block;
+}
+
+input {
+  outline: none;
+  &::placeholder {
+    opacity: 1;
+  }
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+  opacity: 0;
+  background-color: light-dark($body-bg-lightmode, $body-bg-darkmode);
+  color: light-dark($text-color-lightmode, $text-color-darkmode);
+  animation: showApp $duration linear forwards;
+  animation-delay: $duration;
+
+  @keyframes showApp {
+    100% {
+      opacity: 1;
+    }
+  }
+}
+
+main {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.container {
+  padding-left: 24px;
+  padding-right: 24px;
+  width: 100%;
+
+  @include tablet {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+}
+
+.tab {
+  display: none;
+  &.active {
+    display: flex;
+  }
+}
+
+.text-center {
+  text-align: center;
+}

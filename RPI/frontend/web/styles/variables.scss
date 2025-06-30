@@ -1,0 +1,44 @@
+$main-font: 'SF UI Display', sans-serif;
+
+$duration: 0.3s;
+
+$tablet-min-width: 640px;
+
+$text-color: #000;
+$text-color-lightmode: #000;
+$text-color-darkmode: #fff;
+
+$body-bg: #fff;
+$body-bg-lightmode: #fff;
+$body-bg-darkmode: #000;
+
+$grey-light: #f6f6f6;
+$grey: #888;
+$grey-lightmode: #888;
+$grey-darkmode: #b0b0b0;
+
+$status-red: #f32a2a;
+$status-green: #00bf5f;
+$status-yellow: #efc503;
+
+$wine-red: #802539;
+$wine-white: #efc503;
+$wine-rose: #e88489;
+
+$grey-text: $grey;
+$grey-text-lightmode: $grey;
+$grey-text-darkmode: #b0b0b0;
+
+$grey-bg: $grey-light;
+$grey-bg-lightmode: $grey-light;
+$grey-bg-darkmode: #262626;
+
+$grey-border: #e7e7e7;
+$grey-border-lightmode: #e7e7e7;
+$grey-border-darkmode: #4f4f4f;
+$grey-btn-bg: #454545;
+
+$ui-elem-disabled-lightmode: #d1d1d1;
+$ui-elem-disabled-darkmode: #5d5d5d;
+
+$settings-checkbox-enabled: $wine-red;

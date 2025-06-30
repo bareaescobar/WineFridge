@@ -1,0 +1,460 @@
+{
+  "fridges": [
+    {
+      "fridgeName": "Kitchen Fridge",
+      "fridgeBrand": "Wine Enthusiast L26",
+      "fridgeImg": "img/fridge/fridge-thumb-1.png",
+      "selected": false
+    },
+    {
+      "fridgeName": "Lounge Fridge",
+      "fridgeBrand": "WineSmart 360 Pro",
+      "fridgeImg": "img/fridge/fridge-thumb-2.png",
+      "selected": true
+    },
+    {
+      "fridgeName": "Cellar Fridge",
+      "fridgeBrand": "Winobox 500",
+      "fridgeImg": "img/fridge/fridge-thumb-3.png",
+      "selected": false
+    }
+  ],
+  "fridgeId": "wine_fridge_01",
+  "fridgeName": "Lounge Fridge",
+  "lastUpdate": "2025-05-21T10:15:30",
+  "capacity": {
+    "total": 81,
+    "current": 76,
+    "empty": 24
+  },
+  "controls": [
+    {
+      "icon": "scan",
+      "label": "Load",
+      "href": "/load-bottle",
+      "bg": "black"
+    },
+    {
+      "icon": "unload",
+      "label": "Unload",
+      "href": "/unload-bottle",
+      "bg": "black"
+    },
+    {
+      "icon": "sort",
+      "label": "Swap",
+      "href": "/swap-bottle",
+      "bg": "grey"
+    }
+  ],
+  "zones": [
+    {
+      "title": "Upper Zone",
+      "zoneType": "upper",
+      "type": "red",
+      "typeLabel": "Red",
+      "temperature": 16,
+      "humidity": 65,
+      "wines": 21,
+      "drawers": [
+        {
+          "drawerId": "upper_drawer_1",
+          "drawerName": "1 Drawer",
+          "bottleCapacity": 9,
+          "bottlesInDrawer": 8,
+          "href": "/drawer-red-wines",
+          "bottles": [
+            {
+              "position": 1,
+              "barcode": "8410415520628",
+              "name": "Señorío de los Llanos",
+              "type": "Reserva",
+              "region": "Valdepeñas",
+              "vintage": "2018",
+              "weight": 1120.0,
+              "lastInteraction": "2025-05-20T18:45:12",
+              "inFridge": true
+            },
+            {
+              "position": 2,
+              "barcode": "8420209033869",
+              "name": "Silanus",
+              "type": "Joven",
+              "region": "Ribera del Guadiana",
+              "vintage": "2022",
+              "weight": 900.0,
+              "lastInteraction": "2025-05-18T14:23:45",
+              "inFridge": true
+            },
+            {
+              "position": 3,
+              "barcode": "8411543110132",
+              "name": "Viña Pomal",
+              "type": "Crianza",
+              "region": "Rioja",
+              "vintage": "2020",
+              "weight": 1050.0,
+              "lastInteraction": "2025-05-19T09:12:33",
+              "inFridge": true
+            },
+            {
+              "position": 4,
+              "barcode": "8413913022508",
+              "name": "Marqués de Riscal",
+              "type": "Reserva",
+              "region": "Rioja",
+              "vintage": "2016",
+              "weight": 1180.0,
+              "lastInteraction": "2025-05-21T08:05:25",
+              "inFridge": true
+            },
+            {
+              "position": 5,
+              "barcode": "8410702031204",
+              "name": "Protos",
+              "type": "Crianza",
+              "region": "Ribera del Duero",
+              "vintage": "2018",
+              "weight": 1135.0,
+              "lastInteraction": "2025-05-17T20:12:40",
+              "inFridge": true
+            },
+            {
+              "position": 6,
+              "barcode": "8436585840016",
+              "name": "Rolland Galarreta",
+              "type": "Tempranillo",
+              "region": "Rioja",
+              "vintage": "2017",
+              "weight": 1080.0,
+              "lastInteraction": "2025-05-10T11:33:21",
+              "inFridge": true
+            },
+            {
+              "position": 7,
+              "barcode": "8437005880023",
+              "name": "Carmelo Rodero",
+              "type": "Crianza",
+              "region": "Ribera del Duero",
+              "vintage": "2019",
+              "weight": 1090.0,
+              "lastInteraction": "2025-05-15T17:42:18",
+              "inFridge": true
+            },
+            {
+              "position": 8,
+              "barcode": "",
+              "name": "",
+              "type": "",
+              "region": "",
+              "vintage": "",
+              "weight": 0.0,
+              "lastInteraction": "N/A",
+              "inFridge": false
+            },
+            {
+              "position": 9,
+              "barcode": "",
+              "name": "",
+              "type": "",
+              "region": "",
+              "vintage": "",
+              "weight": 0.0,
+              "lastInteraction": "N/A",
+              "inFridge": false
+            }
+          ]
+        },
+        {
+          "drawerId": "upper_drawer_2",
+          "drawerName": "2 Drawer",
+          "bottleCapacity": 9,
+          "bottlesInDrawer": 6,
+          "bottles": [
+            {
+              "position": 1,
+              "barcode": "8410451008115",
+              "name": "Martín Códax",
+              "type": "Albariño",
+              "region": "Rías Baixas",
+              "vintage": "2022",
+              "weight": 950.0,
+              "lastInteraction": "2025-05-18T19:11:05",
+              "inFridge": true
+            },
+            {
+              "position": 2,
+              "barcode": "4004732001219",
+              "name": "Blue Nun",
+              "type": "Liebfraumilch",
+              "region": "Rheinhessen",
+              "vintage": "2021",
+              "weight": 980.0,
+              "lastInteraction": "2025-05-19T16:09:22",
+              "inFridge": true
+            },
+            {
+              "position": 3,
+              "barcode": "3760040433638",
+              "name": "Minuty",
+              "type": "Rosé",
+              "region": "Provence",
+              "vintage": "2023",
+              "weight": 970.0,
+              "lastInteraction": "2025-05-12T14:33:17",
+              "inFridge": true
+            },
+            {
+              "position": 4,
+              "barcode": "8437003819193",
+              "name": "Pago de los Capellanes",
+              "type": "Crianza",
+              "region": "Ribera del Duero",
+              "vintage": "2019",
+              "weight": 1110.0,
+              "lastInteraction": "2025-05-14T12:51:03",
+              "inFridge": true
+            },
+            {
+              "position": 5,
+              "barcode": "8426998270012",
+              "name": "Muga",
+              "type": "Reserva",
+              "region": "Rioja",
+              "vintage": "2019",
+              "weight": 1150.0,
+              "lastInteraction": "2025-05-16T18:22:44",
+              "inFridge": true
+            },
+            {
+              "position": 6,
+              "barcode": "8412655401018",
+              "name": "Pesquera",
+              "type": "Crianza",
+              "region": "Ribera del Duero",
+              "vintage": "2019",
+              "weight": 1100.0,
+              "lastInteraction": "2025-05-17T10:04:32",
+              "inFridge": true
+            },
+            {
+              "position": 7,
+              "barcode": "",
+              "name": "",
+              "type": "",
+              "region": "",
+              "vintage": "",
+              "weight": 0.0,
+              "lastInteraction": "N/A",
+              "inFridge": false
+            },
+            {
+              "position": 8,
+              "barcode": "",
+              "name": "",
+              "type": "",
+              "region": "",
+              "vintage": "",
+              "weight": 0.0,
+              "lastInteraction": "N/A",
+              "inFridge": false
+            },
+            {
+              "position": 9,
+              "barcode": "",
+              "name": "",
+              "type": "",
+              "region": "",
+              "vintage": "",
+              "weight": 0.0,
+              "lastInteraction": "N/A",
+              "inFridge": false
+            }
+          ],
+          "href": "/drawer-red-wines"
+        },
+        {
+          "drawerId": "upper_drawer_3",
+          "drawerName": "3 Drawer",
+          "bottleCapacity": 9,
+          "bottlesInDrawer": 3,
+          "bottles": [
+            {
+              "position": 1,
+              "barcode": "8413336000179",
+              "name": "Ramón Bilbao",
+              "type": "Crianza",
+              "region": "Rioja",
+              "vintage": "2019",
+              "weight": 1070.0,
+              "lastInteraction": "2025-05-10T20:05:18",
+              "inFridge": true
+            },
+            {
+              "position": 2,
+              "barcode": "8411608001189",
+              "name": "Marques de Caceres",
+              "type": "Crianza",
+              "region": "Rioja",
+              "vintage": "2019",
+              "weight": 1050.0,
+              "lastInteraction": "2025-05-13T18:42:55",
+              "inFridge": true
+            },
+            {
+              "position": 3,
+              "barcode": "24011150",
+              "name": "Aceite Girasol",
+              "type": "Girasol",
+              "region": "Prueba",
+              "vintage": "2025",
+              "weight": 999.0,
+              "lastInteraction": "2025-05-11T09:13:27",
+              "inFridge": true
+            },
+            {
+              "position": 4,
+              "barcode": "",
+              "name": "",
+              "type": "",
+              "region": "",
+              "vintage": "",
+              "weight": 0.0,
+              "lastInteraction": "N/A",
+              "inFridge": false
+            },
+            {
+              "position": 5,
+              "barcode": "",
+              "name": "",
+              "type": "",
+              "region": "",
+              "vintage": "",
+              "weight": 0.0,
+              "lastInteraction": "N/A",
+              "inFridge": false
+            },
+            {
+              "position": 6,
+              "barcode": "",
+              "name": "",
+              "type": "",
+              "region": "",
+              "vintage": "",
+              "weight": 0.0,
+              "lastInteraction": "N/A",
+              "inFridge": false
+            },
+            {
+              "position": 7,
+              "barcode": "",
+              "name": "",
+              "type": "",
+              "region": "",
+              "vintage": "",
+              "weight": 0.0,
+              "lastInteraction": "N/A",
+              "inFridge": false
+            },
+            {
+              "position": 8,
+              "barcode": "",
+              "name": "",
+              "type": "",
+              "region": "",
+              "vintage": "",
+              "weight": 0.0,
+              "lastInteraction": "N/A",
+              "inFridge": false
+            },
+            {
+              "position": 9,
+              "barcode": "",
+              "name": "",
+              "type": "",
+              "region": "",
+              "vintage": "",
+              "weight": 0.0,
+              "lastInteraction": "N/A",
+              "inFridge": false
+            }
+          ],
+          "href": "/drawer-red-wines"
+        }
+      ]
+    },
+    {
+      "title": "Middle Zone",
+      "zoneType": "middle",
+      "type": "white",
+      "typeLabel": "White",
+      "temperature": 16,
+      "humidity": 65,
+      "wines": 18,
+      "drawers": [
+        {
+          "drawerId": "middle_drawer_1",
+          "drawerName": "4 Drawer",
+          "bottleCapacity": 9,
+          "bottlesInDrawer": 8,
+          "href": "/drawer-white-wines"
+        },
+        {
+          "drawerId": "middle_drawer_2",
+          "drawerName": "5 Drawer",
+          "bottleCapacity": 9,
+          "bottlesInDrawer": 6,
+          "href": "/drawer-white-wines"
+        },
+        {
+          "drawerId": "middle_drawer_3",
+          "drawerName": "6 Drawer",
+          "bottleCapacity": 9,
+          "bottlesInDrawer": 7,
+          "href": "/drawer-white-wines"
+        }
+      ]
+    },
+    {
+      "title": "Lower Zone",
+      "zoneType": "lower",
+      "type": "roze",
+      "typeLabel": "Roze",
+      "temperature": 16,
+      "humidity": 65,
+      "wines": 18,
+      "drawers": [
+        {
+          "drawerId": "lower_drawer_1",
+          "drawerName": "7 Drawer",
+          "bottleCapacity": 9,
+          "bottlesInDrawer": 8,
+          "href": "/drawer-rose-wines"
+        },
+        {
+          "drawerId": "lower_drawer_2",
+          "drawerName": " 8 Drawer",
+          "bottleCapacity": 9,
+          "bottlesInDrawer": 6,
+          "href": "/drawer-rose-wines"
+        },
+        {
+          "drawerId": "lower_drawer_3",
+          "drawerName": "9 Drawer",
+          "bottleCapacity": 9,
+          "bottlesInDrawer": 7,
+          "href": "/drawer-rose-wines"
+        }
+      ]
+    }
+  ],
+  "sensors": {
+    "temperature": 14.5,
+    "humidity": 65,
+    "lastSensorUpdate": "2025-05-21T10:15:00"
+  },
+  "settings": {
+    "idealTemperature": 14.0,
+    "idealHumidity": 65
+  }
+}
