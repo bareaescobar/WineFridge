@@ -1,7 +1,7 @@
 /*
  * WineFridge Drawer ESP32 - FIXED INDIVIDUAL WEIGHTS
  * Fixed: Calculate individual bottle weights from platform weight differences
- * Claude INDIVIDUAL WEIGHTS FIXED - 13.15 * 01.07.2025
+ * Claude INDIVIDUAL WEIGHTS FIXED v15 - 13.38 * 01.07.2025
  */
 
 #include <WiFi.h>
@@ -9,6 +9,8 @@
 #include <Adafruit_NeoPixel.h>
 #include <ArduinoJson.h>
 #include <HX711.h>
+#include <Adafruit_SHT31.h>
+#include <Wire.h>
 
 // ==================== CONFIGURATION ====================
 #define DRAWER_ID "drawer_1"
@@ -36,11 +38,19 @@ const uint8_t bottleToLed[9] = {32, 28, 24, 20, 16, 12, 8, 4, 0};
 #define HX711_DT_PIN 19
 #define HX711_SCK_PIN 18
 
+// Temperature/Humidity Sensor (I2C)
+#define I2C_SDA_PIN 21
+#define I2C_SCL_PIN 22
+
 // Weight Configuration
 #define WEIGHT_CALIBRATION_FACTOR 94.302184
 #define WEIGHT_THRESHOLD 50.0
 #define WEIGHT_STABILIZATION_TIME 2000
 // MAX_WEIGHT removed - not needed for platform setup
+
+// Temperature/Humidity Configuration
+#define TEMP_OFFSET 0.0       // Calibration offset for temperature
+#define HUMIDITY_OFFSET 0.0   // Calibration offset for humidity
 
 // LED Colors
 #define COLOR_AVAILABLE 0x0000FF
@@ -54,6 +64,7 @@ WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 Adafruit_NeoPixel strip(NUM_LEDS, WS2812_DATA_PIN, NEO_GRB + NEO_KHZ800);
 HX711 scale;
+Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
 // ==================== STATE ====================
 struct DrawerState {
@@ -63,6 +74,11 @@ struct DrawerState {
   unsigned long lastHeartbeat;
   unsigned long uptime;
   bool weightSensorReady;
+  
+  // Temperature/Humidity
+  float temperature;
+  float humidity;
+  bool tempHumidSensorReady;
 } drawerState;
 
 char mqtt_topic_status[64];
@@ -103,6 +119,10 @@ void setup() {
   Serial.println("→ Weight sensor...");
   initWeightSensor();
   
+  // Temperature/Humidity sensor
+  Serial.println("→ Temperature/Humidity sensor...");
+  initTempHumidSensor();
+  
   // Network
   connectWiFi();
   if (WiFi.status() == WL_CONNECTED) {
@@ -137,6 +157,13 @@ void loop() {
   if (millis() - lastPositionCheck > SENSOR_READ_INTERVAL) {
     checkPositionChanges();
     lastPositionCheck = millis();
+  }
+  
+  // Temperature/Humidity reading (every 10 seconds)
+  static unsigned long lastTempHumidCheck = 0;
+  if (millis() - lastTempHumidCheck > 10000) {
+    readTempHumidity();
+    lastTempHumidCheck = millis();
   }
   
   // Heartbeat
@@ -237,6 +264,40 @@ float readStabilizedTotalWeight() {
   } else {
     Serial.println(" - Average");
     return (weight1 + weight2) / 2.0;
+  }
+}
+
+// ==================== TEMPERATURE/HUMIDITY SENSOR ====================
+void initTempHumidSensor() {
+  // Initialize I2C
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+  
+  if (sht31.begin(0x44)) {
+    Serial.println("✓ SHT30 sensor ready");
+    drawerState.tempHumidSensorReady = true;
+    
+    // Read initial values
+    readTempHumidity();
+  } else {
+    Serial.println("⚠ SHT30 sensor not found");
+    drawerState.tempHumidSensorReady = false;
+    drawerState.temperature = 0.0;
+    drawerState.humidity = 0.0;
+  }
+}
+
+void readTempHumidity() {
+  if (!drawerState.tempHumidSensorReady) return;
+  
+  float temp = sht31.readTemperature();
+  float humid = sht31.readHumidity();
+  
+  // Check if readings are valid
+  if (!isnan(temp) && !isnan(humid)) {
+    drawerState.temperature = temp + TEMP_OFFSET;
+    drawerState.humidity = humid + HUMIDITY_OFFSET;
+  } else {
+    Serial.println("⚠ Failed to read SHT30 sensor");
   }
 }
 
@@ -451,6 +512,9 @@ void sendHeartbeat() {
   data["wifi_rssi"] = WiFi.RSSI();
   data["weight_sensor_ready"] = drawerState.weightSensorReady;
   data["total_weight"] = drawerState.lastTotalWeight;  // Include total platform weight
+  data["temperature"] = round(drawerState.temperature * 10.0) / 10.0;
+  data["humidity"] = round(drawerState.humidity * 10.0) / 10.0;
+  data["temp_humid_sensor_ready"] = drawerState.tempHumidSensorReady;
   
   JsonArray positions = data.createNestedArray("positions");
   for (int i = 0; i < 9; i++) {
@@ -503,6 +567,8 @@ void handleSerialCommands() {
       printStatus();
     } else if (cmd == "WEIGHT") {
       testWeight();
+    } else if (cmd == "TEMP") {
+      testTempHumidity();
     } else if (cmd == "TARE") {
       scale.tare();
       drawerState.lastTotalWeight = 0.0;  // Reset total weight tracking
@@ -545,6 +611,29 @@ void testWeight() {
     Serial.println("g");
   }
   Serial.println("==================\n");
+}
+
+void testTempHumidity() {
+  Serial.println("\n=== TEMPERATURE/HUMIDITY TEST ===");
+  Serial.print("Sensor ready: ");
+  Serial.println(drawerState.tempHumidSensorReady ? "YES" : "NO");
+  
+  if (drawerState.tempHumidSensorReady) {
+    for (int i = 0; i < 3; i++) {
+      readTempHumidity();
+      Serial.print("Reading ");
+      Serial.print(i + 1);
+      Serial.print(": ");
+      Serial.print(drawerState.temperature);
+      Serial.print("°C, ");
+      Serial.print(drawerState.humidity);
+      Serial.println("%");
+      delay(2000);
+    }
+  } else {
+    Serial.println("⚠ Sensor not available");
+  }
+  Serial.println("=====================================\n");
 }
 
 void calibrateWeight() {
@@ -609,13 +698,27 @@ void printStatus() {
   Serial.println(WiFi.isConnected() ? "OK" : "FAIL");
   Serial.print("MQTT: ");
   Serial.println(mqttClient.connected() ? "OK" : "FAIL");
-  Serial.print("Weight: ");
+  Serial.print("Weight Sensor: ");
   Serial.println(drawerState.weightSensorReady ? "OK" : "FAIL");
+  Serial.print("Temp/Humid Sensor: ");
+  Serial.println(drawerState.tempHumidSensorReady ? "OK" : "FAIL");
+  Serial.print("Uptime: ");
+  Serial.print(millis() / 1000);
+  Serial.println(" seconds");
   
   if (drawerState.weightSensorReady) {
     Serial.print("Total platform weight: ");
     Serial.print(drawerState.lastTotalWeight);
     Serial.println("g");
+  }
+  
+  if (drawerState.tempHumidSensorReady) {
+    Serial.print("Temperature: ");
+    Serial.print(drawerState.temperature);
+    Serial.println("°C");
+    Serial.print("Humidity: ");
+    Serial.print(drawerState.humidity);
+    Serial.println("%");
   }
   
   for (int i = 0; i < 9; i++) {
@@ -637,6 +740,7 @@ void printHelp() {
   Serial.println("\n=== COMMANDS ===");
   Serial.println("STATUS     - System status");
   Serial.println("WEIGHT     - Test total weight");
+  Serial.println("TEMP       - Test temperature/humidity");
   Serial.println("TARE       - Zero sensor");
   Serial.println("CALIBRATE  - Calibrate");
   Serial.println("HEARTBEAT  - Send heartbeat");
