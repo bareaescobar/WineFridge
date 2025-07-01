@@ -1,7 +1,7 @@
 /*
  * WineFridge Drawer ESP32 - FIXED INDIVIDUAL WEIGHTS
  * Fixed: Calculate individual bottle weights from platform weight differences
- * Claude INDIVIDUAL WEIGHTS FIXED v15 - 13.38 * 01.07.2025
+ * Claude Código Simplificado con SHT30 Funcional - 16.41 * 01.07.2025
  */
 
 #include <WiFi.h>
@@ -9,8 +9,8 @@
 #include <Adafruit_NeoPixel.h>
 #include <ArduinoJson.h>
 #include <HX711.h>
-#include <Adafruit_SHT31.h>
 #include <Wire.h>
+#include "Adafruit_SHT31.h"
 
 // ==================== CONFIGURATION ====================
 #define DRAWER_ID "drawer_1"
@@ -38,19 +38,10 @@ const uint8_t bottleToLed[9] = {32, 28, 24, 20, 16, 12, 8, 4, 0};
 #define HX711_DT_PIN 19
 #define HX711_SCK_PIN 18
 
-// Temperature/Humidity Sensor (I2C)
-#define I2C_SDA_PIN 21
-#define I2C_SCL_PIN 22
-
 // Weight Configuration
 #define WEIGHT_CALIBRATION_FACTOR 94.302184
 #define WEIGHT_THRESHOLD 50.0
 #define WEIGHT_STABILIZATION_TIME 2000
-// MAX_WEIGHT removed - not needed for platform setup
-
-// Temperature/Humidity Configuration
-#define TEMP_OFFSET 0.0       // Calibration offset for temperature
-#define HUMIDITY_OFFSET 0.0   // Calibration offset for humidity
 
 // LED Colors
 #define COLOR_AVAILABLE 0x0000FF
@@ -74,11 +65,7 @@ struct DrawerState {
   unsigned long lastHeartbeat;
   unsigned long uptime;
   bool weightSensorReady;
-  
-  // Temperature/Humidity
-  float temperature;
-  float humidity;
-  bool tempHumidSensorReady;
+  bool tempSensorReady;
 } drawerState;
 
 char mqtt_topic_status[64];
@@ -115,13 +102,19 @@ void setup() {
   testLEDsStartup();
   Serial.println("✓ LEDs ready");
   
-  // Weight sensor with SMART TARE
+  // Weight sensor
   Serial.println("→ Weight sensor...");
   initWeightSensor();
   
-  // Temperature/Humidity sensor
-  Serial.println("→ Temperature/Humidity sensor...");
-  initTempHumidSensor();
+  // Temperature sensor - SIMPLE
+  Serial.println("→ Temperature sensor...");
+  if (sht31.begin(0x44)) {
+    Serial.println("✓ SHT30 sensor ready");
+    drawerState.tempSensorReady = true;
+  } else {
+    Serial.println("⚠ SHT30 sensor not found");
+    drawerState.tempSensorReady = false;
+  }
   
   // Network
   connectWiFi();
@@ -159,13 +152,6 @@ void loop() {
     lastPositionCheck = millis();
   }
   
-  // Temperature/Humidity reading (every 10 seconds)
-  static unsigned long lastTempHumidCheck = 0;
-  if (millis() - lastTempHumidCheck > 10000) {
-    readTempHumidity();
-    lastTempHumidCheck = millis();
-  }
-  
   // Heartbeat
   if (mqttClient.connected() && millis() - drawerState.lastHeartbeat > HEARTBEAT_INTERVAL) {
     sendHeartbeat();
@@ -176,7 +162,7 @@ void loop() {
   handleSerialCommands();
 }
 
-// ==================== WEIGHT SENSOR - SIMPLIFIED & FIXED ====================
+// ==================== WEIGHT SENSOR ====================
 void initWeightSensor() {
   scale.begin(HX711_DT_PIN, HX711_SCK_PIN);
   
@@ -264,40 +250,6 @@ float readStabilizedTotalWeight() {
   } else {
     Serial.println(" - Average");
     return (weight1 + weight2) / 2.0;
-  }
-}
-
-// ==================== TEMPERATURE/HUMIDITY SENSOR ====================
-void initTempHumidSensor() {
-  // Initialize I2C
-  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  
-  if (sht31.begin(0x44)) {
-    Serial.println("✓ SHT30 sensor ready");
-    drawerState.tempHumidSensorReady = true;
-    
-    // Read initial values
-    readTempHumidity();
-  } else {
-    Serial.println("⚠ SHT30 sensor not found");
-    drawerState.tempHumidSensorReady = false;
-    drawerState.temperature = 0.0;
-    drawerState.humidity = 0.0;
-  }
-}
-
-void readTempHumidity() {
-  if (!drawerState.tempHumidSensorReady) return;
-  
-  float temp = sht31.readTemperature();
-  float humid = sht31.readHumidity();
-  
-  // Check if readings are valid
-  if (!isnan(temp) && !isnan(humid)) {
-    drawerState.temperature = temp + TEMP_OFFSET;
-    drawerState.humidity = humid + HUMIDITY_OFFSET;
-  } else {
-    Serial.println("⚠ Failed to read SHT30 sensor");
   }
 }
 
@@ -511,17 +463,31 @@ void sendHeartbeat() {
   data["uptime"] = drawerState.uptime;
   data["wifi_rssi"] = WiFi.RSSI();
   data["weight_sensor_ready"] = drawerState.weightSensorReady;
-  data["total_weight"] = drawerState.lastTotalWeight;  // Include total platform weight
-  data["temperature"] = round(drawerState.temperature * 10.0) / 10.0;
-  data["humidity"] = round(drawerState.humidity * 10.0) / 10.0;
-  data["temp_humid_sensor_ready"] = drawerState.tempHumidSensorReady;
+  data["total_weight"] = drawerState.lastTotalWeight;
+  
+  // Simple temperature reading - exactly like the working example
+  if (drawerState.tempSensorReady) {
+    float t = sht31.readTemperature();
+    float h = sht31.readHumidity();
+    
+    if (!isnan(t) && !isnan(h)) {
+      data["temperature"] = round(t * 10.0) / 10.0;
+      data["humidity"] = round(h * 10.0) / 10.0;
+    } else {
+      data["temperature"] = 0.0;
+      data["humidity"] = 0.0;
+    }
+  } else {
+    data["temperature"] = 0.0;
+    data["humidity"] = 0.0;
+  }
   
   JsonArray positions = data.createNestedArray("positions");
   for (int i = 0; i < 9; i++) {
     JsonObject pos = positions.createNestedObject();
     pos["position"] = i + 1;
     pos["occupied"] = drawerState.positions[i];
-    pos["weight"] = round(drawerState.individualWeights[i] * 10.0) / 10.0;  // Individual weight
+    pos["weight"] = round(drawerState.individualWeights[i] * 10.0) / 10.0;
   }
   
   String output;
@@ -540,8 +506,8 @@ void sendBottleEvent(uint8_t position, bool occupied, float weight) {
   JsonObject data = doc.createNestedObject("data");
   data["event"] = occupied ? "placed" : "removed";
   data["position"] = position;
-  data["weight"] = weight;  // Individual bottle weight
-  data["total_weight"] = drawerState.lastTotalWeight;  // Total platform weight
+  data["weight"] = weight;
+  data["total_weight"] = drawerState.lastTotalWeight;
   
   String output;
   serializeJson(doc, output);
@@ -556,7 +522,7 @@ void sendBottleEvent(uint8_t position, bool occupied, float weight) {
   Serial.println("g)");
 }
 
-// ==================== SERIAL COMMANDS - SIMPLIFIED ====================
+// ==================== SERIAL COMMANDS ====================
 void handleSerialCommands() {
   if (Serial.available()) {
     String cmd = Serial.readStringUntil('\n');
@@ -568,10 +534,10 @@ void handleSerialCommands() {
     } else if (cmd == "WEIGHT") {
       testWeight();
     } else if (cmd == "TEMP") {
-      testTempHumidity();
+      testTemp();
     } else if (cmd == "TARE") {
       scale.tare();
-      drawerState.lastTotalWeight = 0.0;  // Reset total weight tracking
+      drawerState.lastTotalWeight = 0.0;
       Serial.println("✓ Manual tare done - total weight reset");
     } else if (cmd == "CALIBRATE") {
       calibrateWeight();
@@ -603,37 +569,36 @@ void testWeight() {
       Serial.println("g");
       delay(1000);
     }
-    
-    Serial.println("Stabilized reading:");
-    float weight = readStabilizedTotalWeight();
-    Serial.print("Final total: ");
-    Serial.print(weight);
-    Serial.println("g");
   }
   Serial.println("==================\n");
 }
 
-void testTempHumidity() {
-  Serial.println("\n=== TEMPERATURE/HUMIDITY TEST ===");
+void testTemp() {
+  Serial.println("\n=== TEMP TEST ===");
   Serial.print("Sensor ready: ");
-  Serial.println(drawerState.tempHumidSensorReady ? "YES" : "NO");
+  Serial.println(drawerState.tempSensorReady ? "YES" : "NO");
   
-  if (drawerState.tempHumidSensorReady) {
+  if (drawerState.tempSensorReady) {
     for (int i = 0; i < 3; i++) {
-      readTempHumidity();
+      float t = sht31.readTemperature();
+      float h = sht31.readHumidity();
+      
       Serial.print("Reading ");
       Serial.print(i + 1);
       Serial.print(": ");
-      Serial.print(drawerState.temperature);
-      Serial.print("°C, ");
-      Serial.print(drawerState.humidity);
-      Serial.println("%");
-      delay(2000);
+      if (!isnan(t) && !isnan(h)) {
+        Serial.print("Temp = ");
+        Serial.print(t);
+        Serial.print("°C, Hum = ");
+        Serial.print(h);
+        Serial.println("%");
+      } else {
+        Serial.println("Failed to read");
+      }
+      delay(1000);
     }
-  } else {
-    Serial.println("⚠ Sensor not available");
   }
-  Serial.println("=====================================\n");
+  Serial.println("=================\n");
 }
 
 void calibrateWeight() {
@@ -700,11 +665,8 @@ void printStatus() {
   Serial.println(mqttClient.connected() ? "OK" : "FAIL");
   Serial.print("Weight Sensor: ");
   Serial.println(drawerState.weightSensorReady ? "OK" : "FAIL");
-  Serial.print("Temp/Humid Sensor: ");
-  Serial.println(drawerState.tempHumidSensorReady ? "OK" : "FAIL");
-  Serial.print("Uptime: ");
-  Serial.print(millis() / 1000);
-  Serial.println(" seconds");
+  Serial.print("Temp Sensor: ");
+  Serial.println(drawerState.tempSensorReady ? "OK" : "FAIL");
   
   if (drawerState.weightSensorReady) {
     Serial.print("Total platform weight: ");
@@ -712,13 +674,16 @@ void printStatus() {
     Serial.println("g");
   }
   
-  if (drawerState.tempHumidSensorReady) {
-    Serial.print("Temperature: ");
-    Serial.print(drawerState.temperature);
-    Serial.println("°C");
-    Serial.print("Humidity: ");
-    Serial.print(drawerState.humidity);
-    Serial.println("%");
+  if (drawerState.tempSensorReady) {
+    float t = sht31.readTemperature();
+    float h = sht31.readHumidity();
+    if (!isnan(t) && !isnan(h)) {
+      Serial.print("Temperature: ");
+      Serial.print(t);
+      Serial.print("°C, Humidity: ");
+      Serial.print(h);
+      Serial.println("%");
+    }
   }
   
   for (int i = 0; i < 9; i++) {
@@ -739,8 +704,8 @@ void printStatus() {
 void printHelp() {
   Serial.println("\n=== COMMANDS ===");
   Serial.println("STATUS     - System status");
-  Serial.println("WEIGHT     - Test total weight");
-  Serial.println("TEMP       - Test temperature/humidity");
+  Serial.println("WEIGHT     - Test weight");
+  Serial.println("TEMP       - Test temperature");
   Serial.println("TARE       - Zero sensor");
   Serial.println("CALIBRATE  - Calibrate");
   Serial.println("HEARTBEAT  - Send heartbeat");
