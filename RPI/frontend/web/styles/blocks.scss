@@ -192,17 +192,17 @@
 
   .drawer-position {
     color: #eff2f5;
-    &.red-wine {
+    &.red {
       ellipse.active {
         fill: $wine-red;
       }
     }
-    &.white-wine {
+    &.white {
       ellipse.active {
         fill: $wine-white;
       }
     }
-    &.rose-wine {
+    &.dessert {
       ellipse.active {
         fill: $wine-rose;
       }

@@ -5,15 +5,17 @@ import {
   codeModalsGroupHandler,
   controlsDropdownTogglersHandler,
   handleMQTTMessage,
-  getZoneWinesAmount,
-  getOccupiedPositions,
   getZoneFormData,
   fetchSync,
+  getZoneWinesAmount,
+  getFridgeLighting,
+  getZoneLightning,
 } from './helpers/helpers'
 
 import { connectMQTT, publish, subscribe } from './mqttClient'
 import { TOPICS } from './constants/topics'
 import { BROKER_URL } from './constants/mqtt-variables'
+import { renderFridgeCapacity, renderZone } from './helpers/templates'
 
 const zonesConfig = [
   { drawers: ['drawer_1', 'drawer_2', 'drawer_3'], key: 'upper' },
@@ -21,64 +23,33 @@ const zonesConfig = [
   { drawers: ['drawer_7', 'drawer_8', 'drawer_9'], key: 'lower' },
 ]
 
+const port = 3000
+
 const fridgePincodeOldModal = document.getElementById('fridge-pincode-old-modal')
 const fridgePincodeNewModal = document.getElementById('fridge-pincode-new-modal')
 const fridgePincodeConfirmModal = document.getElementById('fridge-pincode-confirm-modal')
 const fridgePincodeSuccessModal = document.getElementById('fridge-pincode-success-modal')
+const fridgeCapacity = document.querySelector('.fridge-capacity')
+const zoneParamsModal = document.getElementById('zone-params-modal')
+const scanCircle = document.querySelector('.processing')
 const fridgePincodeModalsArray = [
   fridgePincodeOldModal,
   fridgePincodeNewModal,
   fridgePincodeConfirmModal,
   fridgePincodeSuccessModal,
 ]
-const zoneParamsModal = document.getElementById('zone-params-modal')
-const fridgeCapacity = document.querySelector('.fridge-capacity')
-const fridgeCapacityStatus = fridgeCapacity.querySelector('.capacity-status span')
-const fridgeCapacityProgress = fridgeCapacity.querySelector('.capacity-progress span')
-const fridgeCapacityLeft = fridgeCapacity.querySelector('.capacity-left span')
-const zonesList = Array.from(document.querySelector('.zones-list').children)
-const scanCircle = document.querySelector('.processing')
+
+function renderZonesHTML(zonesConfig, inventory) {
+  return zonesConfig.map((zone) => renderZone(zone, inventory)).join('')
+}
 
 function renderHomepage() {
-  const inventory = fetchSync('http://localhost:5000/inventory')
-  const fullFridgeAmount = Object.values(inventory.drawers).reduce(
-    (acc, { positions }) => acc + Object.keys(positions).length,
-    0,
-  )
-  const totalOccupied = zonesConfig.reduce((sum, zone) => sum + getZoneWinesAmount(zone.drawers), 0)
-  const totalAvailable = fullFridgeAmount - totalOccupied
-  const progressPercent = Math.round((totalOccupied * 100) / fullFridgeAmount)
-
-  fridgeCapacityStatus.textContent = totalOccupied
-  fridgeCapacityLeft.textContent = totalAvailable
-  fridgeCapacityProgress.style.width = `${progressPercent}%`
-
-  zonesList.forEach((zone, i) => {
-    const [modeEl, winesEl, temperatureEl, humidityEl] = zone.querySelectorAll('.params-group-value')
-    const drawerAmountEls = zone.querySelectorAll('.drawer-item-amount')
-    const drawerCapacityEls = zone.querySelectorAll('.drawer-item-capacity')
-
-    const { drawers, key } = zonesConfig[i]
-    const winesAmount = getZoneWinesAmount(drawers)
-
-    const [{ temperature, humidity, mode }] = drawers.map((drawer) => {
-      return inventory.drawers[drawer]
-    }) //temporary get first drawer data
-    modeEl.textContent = mode.charAt(0).toUpperCase() + mode.slice(1)
-    winesEl.textContent = winesAmount
-    temperatureEl.textContent = `${temperature}°C`
-    humidityEl.textContent = `${humidity}%`
-    drawerAmountEls.forEach((el, idx) => {
-      el.textContent = `${getOccupiedPositions(drawers[idx])} Wines`
-    })
-    drawerCapacityEls.forEach((el, idx) => {
-      const occupied = getOccupiedPositions(drawers[idx])
-      const span = el.querySelectorAll('span')[occupied]
-      if (span) {
-        el.insertBefore(document.createElement('br'), span)
-      }
-    })
-  })
+  const inventory = fetchSync(`http://localhost:${port}/inventory`)
+  const current = zonesConfig.reduce((sum, zone) => sum + getZoneWinesAmount(zone.drawers, inventory), 0)
+  const fridgeHTML = renderFridgeCapacity({ current })
+  fridgeCapacity.innerHTML = fridgeHTML
+  document.querySelector('.zones-list').innerHTML = ''
+  document.querySelector('.zones-list').innerHTML = renderZonesHTML(zonesConfig, inventory)
 }
 
 const modalActions = {
@@ -117,7 +88,7 @@ const modalActions = {
         publish(TOPICS.WEB_TO_RPI_COMMAND, message)
         ////temporary fetch request to update inventory
         try {
-          fetch('http://localhost:5000/update-inventory', {
+          fetch(`http://localhost:${port}/update-inventory`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -136,6 +107,52 @@ const modalActions = {
         }
       }
     })
+  },
+  'zone-lighting-modal-save': (btn) => {
+    const form = btn.closest('.form')
+    const key = form.dataset.key
+    const formData = getZoneLightning(form)
+    const data = {
+      action: 'set_brightness',
+      zone: key,
+      value: formData.brightness,
+      color_temp: formData.colorType,
+    }
+    const payload = {
+      timestamp: new Date().toISOString(),
+      source: 'web_client',
+      target: 'rpi_server',
+      message_type: 'command',
+      data,
+    }
+    const message = JSON.stringify(payload)
+    publish(TOPICS.WEB_TO_RPI_COMMAND, message)
+  },
+  'fridge-lighting-modal-save': (btn) => {
+    const form = btn.closest('.form')
+    const formData = getFridgeLighting(form)
+    const data = {
+      action: 'set_lighting_mode',
+      energy_saving: formData.savingMode,
+      night_mode: formData.nightMode,
+    }
+    const payload = {
+      timestamp: new Date().toISOString(),
+      source: 'web_client',
+      target: 'rpi_server',
+      message_type: 'command',
+      data,
+    }
+    const message = JSON.stringify(payload)
+    publish(TOPICS.WEB_TO_RPI_COMMAND, message)
+  },
+  'zone-lighting-modal': (btn) => {
+    const targetId = btn.dataset.target
+    const targetKey = btn.dataset.key
+    const target = document.getElementById(targetId)
+    const name = btn.querySelector('.fridge-zone-name').textContent
+    target.querySelector('.modal-head-title').textContent = `${name} Lighting`
+    target.querySelector('.form').dataset.key = targetKey
   },
 }
 

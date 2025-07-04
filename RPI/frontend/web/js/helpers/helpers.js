@@ -463,18 +463,15 @@ export function getBottleDetails(barcode) {
 export function handleMQTTMessage(rawMessage, mqttActions) {
   try {
     const { action, data } = JSON.parse(rawMessage)
-    mqttActions[action](data)
+
+    if (typeof mqttActions[action] === 'function') {
+      mqttActions[action](data)
+    } else {
+      console.warn(`Unhandled MQTT action: "${action}"`)
+    }
   } catch (error) {
-    if (!client) throw new Error('Failed to handle MQTT message:', error)
+    console.error('Failed to handle MQTT message:', error)
   }
-}
-
-export function getOccupiedPositions(drowerIndex) {
-  return Object.values(inventory.drawers[drowerIndex].positions).filter((pos) => pos.occupied).length
-}
-
-export function getZoneWinesAmount(drawers) {
-  return drawers.reduce((sum, drawer) => sum + getOccupiedPositions(drawer), 0)
 }
 
 export function getZoneFormData(modalElement) {
@@ -504,6 +501,25 @@ export function getZoneFormData(modalElement) {
   }
 }
 
+export function getFridgeLighting(formElem) {
+  const checkboxes = formElem.querySelectorAll('input[type="checkbox"]')
+  return Array.from(checkboxes).reduce((acc, { name, checked }) => {
+    acc[name] = checked
+    return acc
+  }, {})
+}
+
+export function getZoneLightning(formElem) {
+  const radios = formElem.querySelectorAll('input[type="radio"]:checked')
+  const range = formElem.querySelector('input[type="range"]')
+  const colorTypes = Array.from(radios).reduce((acc, { name, value }) => {
+    acc[name] = value
+    return acc
+  }, {})
+
+  return { ...colorTypes, [range.name]: range.value }
+}
+
 export function parseWineInfo(infoString) {
   const result = {}
   const tempMatch = infoString.match(/(\d+)\s*°C/i)
@@ -529,3 +545,51 @@ export function fetchSync(url) {
     throw error
   }
 }
+
+export function updateProductView(productEl, textEl, wine) {
+  const img = productEl.querySelector('img')
+  const title = productEl.querySelector('.product-item-title')
+  const rating = productEl.querySelector('.product-item-rating')
+  const volume = productEl.querySelector('.product-item-volume')
+  img.src = wine.img
+  img.alt = wine.title || ''
+  title.textContent = wine.title
+  rating.textContent = wine.avg_rating || ''
+  volume.textContent = wine.volume
+  textEl.classList.remove('active')
+  productEl.classList.add('active')
+}
+
+export function animateSwapPlaceholders() {
+  const swapGroup = document.querySelector('.swap-group')
+  const placeholders = swapGroup.querySelectorAll('.bottle-placeholder')
+  const divider = swapGroup.querySelector('.divider')
+  if (placeholders.length < 2 || !divider) return
+
+  const [first, second] = placeholders
+  swapGroup.classList.add('swapped')
+
+  setTimeout(() => {
+    swapGroup.removeChild(first)
+    swapGroup.removeChild(second)
+    swapGroup.insertBefore(second, divider)
+    swapGroup.insertBefore(first, divider.nextSibling)
+    swapGroup.classList.remove('swapped')
+  }, 500)
+}
+
+export function calculateVolumePercent(weight, emptyWeight = 500, fullWeight = 1200) {
+  const liquidWeight = fullWeight - emptyWeight
+  const rawPercent = ((weight - emptyWeight) / liquidWeight) * 100
+  return Math.max(0, Math.min(100, Math.round(rawPercent)))
+}
+
+export function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1)
+}
+
+export const getOccupiedPositions = (drawerName) =>
+  Object.values(inventory.drawers[drawerName].positions).filter((pos) => pos.occupied).length
+
+export const getZoneWinesAmount = (drawerNames) =>
+  drawerNames.reduce((sum, drawer) => sum + getOccupiedPositions(drawer), 0)

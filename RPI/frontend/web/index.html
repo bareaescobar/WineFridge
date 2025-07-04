@@ -35,20 +35,7 @@
       <main>
         <section class="block-fridge" id="lounge-fridge">
           <div class="container block-head">
-            <div class="fridge-capacity">
-              <div class="capacity-head">
-                <div class="capacity-status"><span>{{capacity.current}}</span>/ {{capacity.total}} Wines</div>
-                <button class="icon-btn grey-btn capacity-settings-btn" data-target="fridge-info-modal">
-                  <svg class="icon">
-                    <use href="#icon-settings"></use>
-                  </svg>
-                </button>
-              </div>
-              <div class="capacity-progress">
-                <span class="green" style="width: 76%"></span>
-              </div>
-              <div class="capacity-left"><span>{{capacity.empty}}</span> Empty Spaces</div>
-            </div>
+            <div class="fridge-capacity"></div>
             <div class="fridge-controls">
               {{#each controls}}
               <div class="fridge-control-group">
@@ -62,57 +49,7 @@
               {{/each}}
             </div>
           </div>
-          <div class="container zones-list">
-            {{#each zones}}
-            <div class="zone {{type}}">
-              <div class="zone-title">
-                <button class="text-arrow-wide-btn" data-target="zone-params-modal">
-                  <span class="text">{{title}}</span>
-                </button>
-              </div>
-              <div class="zone-params">
-                <div class="params-group">
-                  <div class="params-group-value">{{typeLabel}}</div>
-                  <div class="params-group-label">Type</div>
-                </div>
-                <div class="params-group">
-                  <div class="params-group-value">{{wines}}</div>
-                  <div class="params-group-label">Wines</div>
-                </div>
-                <div class="params-group">
-                  <div class="params-group-value">{{temperature}}°C</div>
-                  <div class="params-group-label">Temp</div>
-                </div>
-                <div class="params-group">
-                  <div class="params-group-value">{{humidity}}%</div>
-                  <div class="params-group-label">Humidity</div>
-                </div>
-              </div>
-              <div class="zone-drawers">
-                {{#each drawers}}
-                <a href="{{href}}" class="drawer-item">
-                  <div class="drawer-item-info">
-                    <div class="drawer-item-title">{{drawerName}}</div>
-                    <div class="drawer-item-amount">{{bottlesInDrawer}} Wines</div>
-                  </div>
-                  <div class="drawer-item-capacity">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <br />
-                    <span></span>
-                  </div>
-                </a>
-                {{/each}}
-              </div>
-            </div>
-            {{/each}}
-          </div>
+          <div class="container zones-list"></div>
         </section>
       </main>
       <div class="modal from-bottom-modal" id="fridge-selector-modal">
@@ -210,7 +147,7 @@
               <div class="fridge-zones-label">Zones</div>
               <div class="fridge-zones-list">
                 {{#each zones}}
-                <div class="fridge-zone" data-target="zone-params-modal">
+                <div class="fridge-zone" data-target="zone-lighting-modal" data-key="{{zoneType}}">
                   <div class="fridge-zone-icon">
                     <svg class="icon">
                       <use href="#icon-zone-{{zoneType}}"></use>
@@ -281,49 +218,20 @@
               <div class="checkbox-wrapper">
                 <div class="checkbox-text">Energy Saving Mode</div>
                 <label class="switcher">
-                  <input type="checkbox" name="" hidden />
+                  <input type="checkbox" name="savingMode" hidden />
                   <span class="checkbox-box"></span>
                 </label>
               </div>
               <div class="checkbox-wrapper">
                 <div class="checkbox-text">Night Mode</div>
                 <label class="switcher">
-                  <input type="checkbox" name="" hidden checked />
+                  <input type="checkbox" name="nightMode" hidden checked />
                   <span class="checkbox-box"></span>
                 </label>
               </div>
             </div>
-            <div class="fridge-lighting-colors-group">
-              <div class="group-title">Color Type</div>
-              <div class="color-selectors">
-                <label class="color-selector">
-                  <input type="radio" name="lighting-color-type-1" hidden />
-                  <span class="radio-thumb"></span>
-                  <span class="radio-text">Warm White</span>
-                </label>
-                <label class="color-selector">
-                  <input type="radio" name="lighting-color-type-1" hidden checked />
-                  <span class="radio-thumb"></span>
-                  <span class="radio-text">Cool White</span>
-                </label>
-                <label class="color-selector">
-                  <input type="radio" name="lighting-color-type-1" hidden />
-                  <span class="radio-thumb"></span>
-                  <span class="radio-text">Neutral White</span>
-                </label>
-              </div>
-            </div>
-            <div class="linear-progress-group fridge-lighting-brightness-group">
-              <div class="linear-progress-head">
-                <div class="linear-progress-label">Brightness</div>
-                <div class="linear-progress-value"><span>75</span>%</div>
-              </div>
-              <div class="linear-progress-range">
-                <input type="range" name="" id="" min="0" max="100" step="1" value="75" />
-                <div class="input-progress"></div>
-              </div>
-            </div>
-            <button class="btn modal-close">Save</button>
+
+            <button class="btn modal-close save-form">Save</button>
           </div>
         </div>
       </div>
@@ -482,6 +390,55 @@
         </div>
       </div>
       <!-- end fridge pincodes group -->
+      <div class="modal rtl-modal" id="zone-lighting-modal">
+        <div class="modal-body">
+          <div class="modal-head">
+            <div class="left-group">
+              <button class="icon-btn grey-btn modal-close">
+                <svg class="icon">
+                  <use href="#icon-arrow-left"></use>
+                </svg>
+              </button>
+            </div>
+            <div class="center-group">
+              <div class="modal-head-title">Lighting</div>
+            </div>
+          </div>
+          <div class="form">
+            <div class="fridge-lighting-colors-group">
+              <div class="group-title">Color Type</div>
+              <div class="color-selectors">
+                <label class="color-selector">
+                  <input type="radio" name="colorType" value="warm_white" hidden />
+                  <span class="radio-thumb"></span>
+                  <span class="radio-text">Warm White</span>
+                </label>
+                <label class="color-selector">
+                  <input type="radio" name="colorType" value="cool_white" hidden checked />
+                  <span class="radio-thumb"></span>
+                  <span class="radio-text">Cool White</span>
+                </label>
+                <label class="color-selector">
+                  <input type="radio" name="colorType" value="neutral_white" hidden />
+                  <span class="radio-thumb"></span>
+                  <span class="radio-text">Neutral White</span>
+                </label>
+              </div>
+            </div>
+            <div class="linear-progress-group fridge-lighting-brightness-group">
+              <div class="linear-progress-head">
+                <div class="linear-progress-label">Brightness</div>
+                <div class="linear-progress-value"><span>75</span>%</div>
+              </div>
+              <div class="linear-progress-range">
+                <input type="range" name="brightness" id="" min="0" max="100" step="1" value="75" />
+                <div class="input-progress"></div>
+              </div>
+            </div>
+            <button class="btn modal-close save-form">Save</button>
+          </div>
+        </div>
+      </div>
       <div class="modal rtl-modal" id="zone-params-modal">
         <div class="processing">
           <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -601,9 +558,11 @@
         </div>
       </div>
       <include src="web/partials/temperature-guide-modal.html"></include>
+      <include src="web/partials/unauthorized-unload.html"></include>
       <include src="web/partials/sprite.html"></include>
     </div>
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/home.js"></script>
+    <script type="module" src="js/unauthorized-unload.js"></script>
   </body>
 </html>

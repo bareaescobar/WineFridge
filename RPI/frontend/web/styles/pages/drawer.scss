@@ -1,5 +1,5 @@
 .drawer {
-  &.red-wine-drawer {
+  &.red {
     .bottle {
       &-image {
         background-image: url('../img/svg/red-wine-bottle.svg');
@@ -11,7 +11,7 @@
       }
     }
   }
-  &.white-wine-drawer {
+  &.white {
     .bottle {
       &-image {
         background-image: url('../img/svg/white-wine-bottle.svg');
@@ -23,7 +23,7 @@
       }
     }
   }
-  &.rose-wine-drawer {
+  &.dessert {
     .bottle {
       &-image {
         background-image: url('../img/svg/rose-wine-bottle.svg');
