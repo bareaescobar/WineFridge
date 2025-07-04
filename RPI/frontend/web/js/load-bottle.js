@@ -1,6 +1,12 @@
 import { BROKER_URL } from './constants/mqtt-variables'
 import { TOPICS } from './constants/topics'
-import { imgInputsHandler, favoriteHandler, handleMQTTMessage, updateBottleInfoModal } from './helpers/helpers'
+import {
+  imgInputsHandler,
+  favoriteHandler,
+  handleMQTTMessage,
+  updateBottleInfoModal,
+  fetchSync,
+} from './helpers/helpers'
 import { connectMQTT, publish, subscribe } from './mqttClient'
 import wineCatalog from '../../../database/wine-catalog.json'
 
@@ -16,6 +22,7 @@ const loadBottleErrorModal = document.getElementById('load-bottle-error-modal')
 const scanCircle = loadBottleWelcomeModal.querySelector('.processing')
 // const errorModalTitle = loadBottleErrorModal.querySelector('.modal-title')
 
+const port = 3000
 let scannedBottle = null
 
 const modalActions = {
@@ -42,6 +49,24 @@ const modalActions = {
 
 const mqttActions = {
   barcode_scanned(data) {
+    const extracted = fetchSync(`http://localhost:${port}/extracted`)
+    const locations = extracted[data.barcode]?.locations
+    if (locations) {
+      const payload = {
+        timestamp: new Date().toISOString(),
+        source: 'web',
+        data: {
+          action: 'start_return',
+          barcode: data.barcode,
+          locations,
+        },
+      }
+      const message = JSON.stringify(payload)
+      publish(TOPICS.WEB_TO_RPI_COMMAND, message)
+      scanCircle.classList.add('active')
+      return
+    }
+
     const bottle = wineCatalog.wines[data?.barcode]
     if (bottle) {
       scannedBottle = { ...bottle, barcode: data.barcode }

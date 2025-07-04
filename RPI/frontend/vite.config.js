@@ -49,6 +49,9 @@ export default defineConfig({
   server: {
     open: './index.html',
     host: true,
+    watch: {
+    ignored: ['**/database/inventory.json'],
+  },
   },
   css: {
     devSourcemap: true,

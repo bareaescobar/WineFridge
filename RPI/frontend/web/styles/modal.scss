@@ -866,6 +866,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
 
   .bottle-placeholder {
     min-height: 250px;
@@ -874,6 +875,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: transform 0.6s ease;
+
+    .product-item {
+      min-width: 350px;
+    }
   }
 
   .placeholder-text {
@@ -887,6 +893,27 @@
     &.active {
       opacity: 1;
     }
+  }
+
+  .bottle-placeholder {
+    transition: transform 0.5s ease;
+    z-index: 1;
+  }
+
+  &.swapped .bottle-placeholder:first-of-type {
+    transform: translateY(496px);
+  }
+
+  &.swapped .bottle-placeholder:last-of-type {
+    transform: translateY(-496px);
+  }
+
+  .divider {
+    z-index: 0;
+  }
+
+  .bottle-placeholder {
+    transition: transform 0.5s ease;
   }
 
   .divider {
@@ -1194,64 +1221,14 @@
     margin-top: 64px;
     margin-left: -24px;
     margin-right: -24px;
-    width: calc(100% + 48px);
+
     position: relative;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-
-    &::before,
-    &::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 102px;
-      z-index: 2;
-    }
-    &::before {
-      left: 0;
-
-      .color-scheme-light &,
-      .color-scheme-system-light & {
-        background: linear-gradient(270deg, rgba(#fff, 0) 0%, rgba(#fff, 0.4) 100%);
-      }
-      .color-scheme-dark &,
-      .color-scheme-system-dark & {
-        background: linear-gradient(270deg, rgba(#000, 0) 0%, rgba(#000, 0.4) 100%);
-      }
-    }
-    &::after {
-      right: 0;
-
-      .color-scheme-light &,
-      .color-scheme-system-light & {
-        background: linear-gradient(90deg, rgba(#fff, 0) 0%, rgba(#fff, 0.4) 100%);
-      }
-      .color-scheme-dark &,
-      .color-scheme-system-dark & {
-        background: linear-gradient(90deg, rgba(#000, 0) 0%, rgba(#000, 0.4) 100%);
-      }
-    }
-
-    &-inner {
-      display: flex;
-      gap: 4px;
-      padding-left: 24px;
-      padding-right: 24px;
-      width: 100%;
-      overflow-y: auto;
-      scrollbar-width: none;
-    }
   }
 
   .product-item {
-    max-width: 190px;
     flex-shrink: 0;
 
     @include tablet {
-      max-width: 280px;
     }
 
     &-info {
