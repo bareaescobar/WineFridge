@@ -27,11 +27,14 @@ export function renderBottle(volume = 100, occupied, barcode, selected) {
 }
 
 export function renderAllBottles(positions) {
+  let firstOccupiedMarked = false
   return Object.entries(positions)
     .map(([i, { weight, occupied, barcode }]) => {
       const volume = calculateVolumePercent(weight)
-      const isFirstPosition = i === '1'
-
+      const isFirstPosition = occupied && !firstOccupiedMarked
+      if (isFirstPosition) {
+        firstOccupiedMarked = true
+      }
       return renderBottle(volume, occupied, barcode, isFirstPosition)
     })
     .join('')

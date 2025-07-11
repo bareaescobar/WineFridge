@@ -1,30 +1,30 @@
 {
   "version": "1.0",
   "name": "Lounge Fridge",
-  "last_updated": "2025-06-24T14:21:41.917Z",
+  "last_updated": "2025-06-30T16:46:55.287Z",
   "total_bottles": 18,
   "drawers": {
     "drawer_1": {
       "zone": "Upper",
-      "temperature": 17,
-      "humidity": 60,
-      "mode": "dessert",
+      "temperature": 16,
+      "humidity": 65,
+      "mode": "red",
       "positions": {
         "1": {
-          "occupied": true,
-          "barcode": "8410337311281",
-          "name": "Señorío de los Llanos Reserva",
-          "weight": 1120,
-          "placed_date": "2025-06-15T12:00:00Z",
-          "aging_days": 2
-        },
-        "2": {
           "occupied": true,
           "barcode": "8410337311274",
           "name": "Finca del Mar Cabernet Sauvignon Crianza",
           "weight": 1150,
           "placed_date": "2025-06-14T15:45:00Z",
           "aging_days": 3
+        },
+        "2": {
+          "occupied": true,
+          "barcode": "8410337311281",
+          "name": "Señorío de los Llanos Reserva",
+          "weight": 1120,
+          "placed_date": "2025-06-15T12:00:00Z",
+          "aging_days": 2
         },
         "3": {
           "occupied": false
@@ -61,9 +61,9 @@
     },
     "drawer_2": {
       "zone": "Upper",
-      "temperature": 17,
-      "humidity": 60,
-      "mode": "dessert",
+      "temperature": 16,
+      "humidity": 65,
+      "mode": "red",
       "positions": {
         "1": {
           "occupied": true,
@@ -106,9 +106,9 @@
     },
     "drawer_3": {
       "zone": "Upper",
-      "temperature": 17,
-      "humidity": 60,
-      "mode": "dessert",
+      "temperature": 16,
+      "humidity": 65,
+      "mode": "red",
       "positions": {
         "1": {
           "occupied": false
@@ -172,20 +172,10 @@
           "aging_days": 5
         },
         "3": {
-          "occupied": true,
-          "barcode": "8410337311205",
-          "name": "Finca del Mar Verdejo",
-          "weight": 1100,
-          "placed_date": "2025-06-12T08:30:00Z",
-          "aging_days": 5
+          "occupied": false
         },
         "4": {
-          "occupied": true,
-          "barcode": "8410337311205",
-          "name": "Finca del Mar Verdejo",
-          "weight": 1100,
-          "placed_date": "2025-06-12T08:30:00Z",
-          "aging_days": 5
+          "occupied": false
         },
         "5": {
           "occupied": true,
@@ -336,12 +326,7 @@
           "occupied": false
         },
         "6": {
-          "occupied": true,
-          "barcode": "8410337311090",
-          "name": "Torres Viña Esmeralda Rosé",
-          "weight": 1170,
-          "placed_date": "2025-06-11T18:20:00Z",
-          "aging_days": 6
+          "occupied": false
         },
         "7": {
           "occupied": false
