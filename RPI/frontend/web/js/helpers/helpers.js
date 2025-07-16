@@ -1,6 +1,5 @@
 import Swiper from 'swiper'
 import 'swiper/css'
-import inventory from '../../../../database/inventory.json'
 
 export function setCookie(cookieName, cookieValue) {
   let d = new Date()
@@ -588,8 +587,8 @@ export function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1)
 }
 
-export const getOccupiedPositions = (drawerName) =>
+export const getOccupiedPositions = (drawerName, inventory) =>
   Object.values(inventory.drawers[drawerName].positions).filter((pos) => pos.occupied).length
 
-export const getZoneWinesAmount = (drawerNames) =>
-  drawerNames.reduce((sum, drawer) => sum + getOccupiedPositions(drawer), 0)
+export const getZoneWinesAmount = (drawerNames, inventory) =>
+  drawerNames.reduce((sum, drawer) => sum + getOccupiedPositions(drawer, inventory), 0)
