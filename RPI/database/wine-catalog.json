@@ -166,8 +166,8 @@
       "atmosphere": ["Romantic"],
       "avg_rating": null,
       "price": "6-9 €",
-      "img": "/img/wine/Rose/Torres-Viña-Esmeralda-Rose.png",
-      "image_url": "/img/wine/Rose/Torres-Viña-Esmeralda-Rose-info-banner-2x.png"
+      "img": "/img/wine/Rose/Torres-Vina-Esmeralda-Rose.png",
+      "image_url": "/img/wine/Rose/Torres-Vina-Esmeralda-Rose-info-banner-2x.png"
     },
     "8410337311106": {
       "name": "Montecillo Rosé",
@@ -406,8 +406,8 @@
       "atmosphere": ["Picnic"],
       "avg_rating": null,
       "price": "4-7 €",
-      "img": "/img/wine/White/Señorio-de-Los-Llanos-Verdejo.png",
-      "image_url": "/img/wine/White/Señorio-de-Los-Llanos-Verdejo-info-banner-2x.png"
+      "img": "/img/wine/White/Senorio-de-Los-Llanos-Verdejo.png",
+      "image_url": "/img/wine/White/Senorio-de-Los-Llanos-Verdejo-info-banner-2x.png"
     },
     "8410337311205": {
       "name": "Finca del Mar Verdejo",
@@ -454,8 +454,8 @@
       "atmosphere": ["Business"],
       "avg_rating": null,
       "price": "6-10 €",
-      "img": "/img/wine/Red/Viña-Cumbrero-Crianza.png",
-      "image_url": "/img/wine/Red/Viña-Cumbrero-Crianza-info-banner-2x.png"
+      "img": "/img/wine/Red/Vina-Cumbrero-Crianza.png",
+      "image_url": "/img/wine/Red/Vina-Cumbrero-Crianza-info-banner-2x.png"
     },
     "8410337311229": {
       "name": "Montesierra Young Red Wine",
@@ -622,8 +622,8 @@
       "atmosphere": ["Cozy"],
       "avg_rating": null,
       "price": "5-8 €",
-      "img": "/img/wine/Red/Señorío-de-los-Llanos-Reserva.png",
-      "image_url": "/img/wine/Red/Señorío-de-los-Llanos-Reserva-info-banner-2x.png"
+      "img": "/img/wine/Red/Senorio-de-los-Llanos-Reserva.png",
+      "image_url": "/img/wine/Red/Senorio-de-los-Llanos-Reserva-info-banner-2x.png"
     },
     "8410337311298": {
       "name": "Silanus Young Red",
