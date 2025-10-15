@@ -46,7 +46,7 @@ class BarcodeScanner:
             raise
 
         # Setup MQTT
-        self.client = mqtt.Client()
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
         try:
             self.client.connect("localhost", 1883)
             print("[Scanner] Conectado a MQTT broker")

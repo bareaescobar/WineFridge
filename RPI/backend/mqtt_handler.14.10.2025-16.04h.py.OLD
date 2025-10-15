@@ -45,12 +45,8 @@ class WineFridgeController:
     # === Handlers ===
 
     def handle_drawer_message(self, drawer_id, message):
-        action = message.get("action", None)
+        action = message["action"]
         data = message.get("data", {})
-        
-        if not action:
-            print(f"[ERROR] No action found in drawer message from {drawer_id}")
-            return
 
         if action == "heartbeat":
             pass  # You can store last_seen here
@@ -60,13 +56,8 @@ class WineFridgeController:
             self.send_to_web("error", data)
 
     def handle_web_command(self, message):
-        # El frontend envía action dentro de data
+        action = message["action"]
         data = message.get("data", {})
-        action = data.get("action", None)
-        
-        if not action:
-            print("[ERROR] No action found in message")
-            return
 
         if action == "start_load":
             self.start_bottle_loading(data["barcode"])
@@ -74,18 +65,12 @@ class WineFridgeController:
             self.start_bottle_removal(data["position"])
 
     def start_bottle_loading(self, barcode):
-        print(f"[DEBUG] start_bottle_loading called with barcode: {barcode}")
-        
         wine = self.catalog.get("wines", {}).get(barcode)
-        print(f"[DEBUG] Wine found: {wine is not None}")
-        
         if not wine:
             self.send_to_web("error", {"message": "Unknown wine"})
             return
 
         slot = self.find_empty_position()
-        print(f"[DEBUG] Empty slot found: {slot}")
-        
         if not slot:
             self.send_to_web("error", {"message": "Fridge full"})
             return
@@ -100,10 +85,6 @@ class WineFridgeController:
             "started": time.time()
         }
 
-        print(f"[DEBUG] Created pending operation: {op_id}")
-        print(f"[DEBUG] All pending operations: {self.pending_operations}")
-        print(f"[DEBUG] Sending LED command to {drawer} position {position}")
-        
         self.send_drawer_command(drawer, {
             "action": "set_leds",
             "source": "rpi",
@@ -113,7 +94,6 @@ class WineFridgeController:
             }
         })
 
-        print(f"[DEBUG] Sending expect_bottle command")
         self.send_drawer_command(drawer, {
             "action": "expect_bottle",
             "source": "rpi",
@@ -125,7 +105,6 @@ class WineFridgeController:
             }
         })
 
-        print(f"[DEBUG] Sending expect_bottle to web")
         self.send_to_web("expect_bottle", {
             "drawer": drawer,
             "position": position,
@@ -135,21 +114,13 @@ class WineFridgeController:
         threading.Timer(30, self.check_timeout, [op_id]).start()
 
     def process_bottle_event(self, drawer, data):
-        print(f"[DEBUG] process_bottle_event called: drawer={drawer}, data={data}")
-        print(f"[DEBUG] pending_operations: {self.pending_operations}")
-        
         pos = data["position"]
         weight = data["weight"]
         op = self.find_pending_op(drawer, pos)
-        
-        print(f"[DEBUG] Found pending operation: {op}")
 
         if op and op["type"] == "load":
             barcode = op["barcode"]
             wine = self.catalog["wines"].get(barcode, {})
-            
-            print(f"[DEBUG] Processing bottle load: barcode={barcode}, wine={wine.get('name')}")
-            
             self.inventory["drawers"].setdefault(drawer, {}).setdefault("positions", {})[str(pos)] = {
                 "occupied": True,
                 "barcode": barcode,
@@ -159,8 +130,6 @@ class WineFridgeController:
                 "aging_days": 0
             }
             self.save_json(INVENTORY_PATH, self.inventory)
-            
-            print(f"[DEBUG] Saved to inventory.json")
 
             self.send_drawer_command(drawer, {
                 "action": "set_leds",
@@ -170,8 +139,6 @@ class WineFridgeController:
                     "duration_ms": 3000
                 }
             })
-            
-            print(f"[DEBUG] Sent LED command")
 
             self.send_to_web("bottle_placed", {
                 "success": True,
@@ -179,18 +146,12 @@ class WineFridgeController:
                 "position": pos,
                 "wine_name": wine.get("name")
             })
-            
-            print(f"[DEBUG] Sent bottle_placed to web")
 
             del self.pending_operations[op["id"]]
-            print(f"[DEBUG] Deleted pending operation")
-        else:
-            print(f"[DEBUG] No matching pending operation found for drawer={drawer}, position={pos}")
 
     def check_timeout(self, op_id):
         if op_id in self.pending_operations:
             op = self.pending_operations.pop(op_id)
-            print(f"[DEBUG] Timeout for operation: {op}")
             self.send_to_web("error", {
                 "message": f"Bottle placement timed out at {op['drawer']} position {op['position']}"
             })
@@ -228,29 +189,20 @@ class WineFridgeController:
         }))
 
     def log_message(self, topic, msg):
-        try:
-            os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-            with open(LOG_PATH, 'a') as f:
-                f.write(f"{datetime.now()} | {topic} | {json.dumps(msg)}\n")
-        except Exception as e:
-            print(f"[ERROR] Failed to log message: {e}")
+        with open(LOG_PATH, 'a') as f:
+            f.write(f"{datetime.now()} | {topic} | {json.dumps(msg)}\n")
 
     def load_json(self, path):
         try:
             with open(path, 'r') as f:
                 return json.load(f)
-        except Exception as e:
-            print(f"[ERROR] Failed to load {path}: {e}")
+        except:
             return {}
 
     def save_json(self, path, data):
-        try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, 'w') as f:
-                json.dump(data, f, indent=2)
-            print(f"[DEBUG] Saved {path} successfully")
-        except Exception as e:
-            print(f"[ERROR] Failed to save {path}: {e}")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
 
 # === Start Controller ===
 if __name__ == "__main__":
