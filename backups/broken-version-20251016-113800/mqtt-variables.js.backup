@@ -1,0 +1,10 @@
+// MQTT Broker Configuration
+
+// IMPORTANT: Using IP address instead of localhost
+// This allows the frontend to connect to the MQTT broker via WebSocket
+// Port 9001 is the WebSocket port configured in Mosquitto
+
+export const BROKER_URL = 'ws://192.168.1.84:9001'
+
+// Alternative for development (if running locally):
+// export const BROKER_URL = 'ws://localhost:9001'

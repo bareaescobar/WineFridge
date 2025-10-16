@@ -1,0 +1,195 @@
+import serial
+import paho.mqtt.client as mqtt
+import json
+from datetime import datetime
+import time
+import re
+
+def find_serial_port():
+    """Detectar automáticamente el puerto serie en RPI5"""
+    import os
+    
+    # Puertos típicos en RPI5
+    possible_ports = ['/dev/ttyAMA0', '/dev/serial0', '/dev/ttyAMA1']
+    
+    for port in possible_ports:
+        if os.path.exists(port):
+            try:
+                ser = serial.Serial(port, 115200, timeout=0.1)
+                ser.close()
+                return port
+            except:
+                continue
+    return '/dev/ttyAMA0'  # Fallback al puerto detectado
+
+class BarcodeScanner:
+    def __init__(self):
+        # Detectar puerto automáticamente
+        port = find_serial_port()
+        print(f"[Scanner] Usando puerto: {port}")
+        
+        try:
+            self.serial = serial.Serial(
+                port=port,
+                baudrate=115200,
+                bytesize=serial.EIGHTBITS,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                timeout=0.1,
+                xonxoff=False,
+                rtscts=False,
+                dsrdtr=False
+            )
+            print(f"[Scanner] Puerto serie {port} abierto correctamente")
+        except Exception as e:
+            print(f"[Scanner] Error abriendo puerto {port}: {e}")
+            raise
+
+        # Setup MQTT - CHANGED TO IP ADDRESS
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+        try:
+            # IMPORTANT: Using IP address instead of localhost
+            self.client.connect("192.168.1.84", 1883)
+            print("[Scanner] Conectado a MQTT broker en 192.168.1.84")
+        except Exception as e:
+            print(f"[Scanner] Error conectando a MQTT: {e}")
+            raise
+
+        self.buffer = ""
+        self.last_barcode = ""
+        self.last_scan_time = 0
+        self.scan_cooldown = 2.0  # Evitar escaneos duplicados en 2 segundos
+
+    def is_valid_barcode(self, code):
+        """Verificar si un código parece válido"""
+        # Eliminar espacios y caracteres no imprimibles
+        code = code.strip()
+        
+        # Debe tener al menos 8 caracteres y máximo 20
+        if len(code) < 8 or len(code) > 20:
+            return False
+            
+        # Debe contener solo números y/o letras (códigos alfanuméricos válidos)
+        if not re.match(r'^[A-Za-z0-9]+$', code):
+            return False
+            
+        return True
+
+    def process_data(self, data):
+        """Procesar datos recibidos del escáner"""
+        try:
+            # Decodificar datos
+            decoded = data.decode('utf-8', errors='ignore')
+            self.buffer += decoded
+            
+            # Este escáner no envía saltos de línea, así que procesamos cuando:
+            # 1. Recibimos suficientes datos (8-20 caracteres)
+            # 2. Hay una pausa en la recepción (detectado por timeout)
+            
+            if len(self.buffer) >= 8:
+                # Esperar un poco por si vienen más datos
+                time.sleep(0.05)
+                
+                # Limpiar el buffer
+                barcode = self.buffer.strip()
+                self.buffer = ""
+                
+                # Validar y publicar
+                if self.is_valid_barcode(barcode):
+                    current_time = time.time()
+                    
+                    # Evitar duplicados
+                    if barcode == self.last_barcode and (current_time - self.last_scan_time) < self.scan_cooldown:
+                        print(f"[Scanner] Código duplicado ignorado: {barcode}")
+                        return
+                    
+                    self.last_barcode = barcode
+                    self.last_scan_time = current_time
+                    self.publish_barcode(barcode)
+                else:
+                    print(f"[Scanner] Código inválido descartado: {barcode}")
+                    
+        except Exception as e:
+            print(f"[Scanner] Error procesando datos: {e}")
+            self.buffer = ""  # Limpiar buffer en caso de error
+
+    def run(self):
+        """Bucle principal del escáner"""
+        print("[Scanner] Iniciando bucle principal...")
+        
+        while True:
+            try:
+                if self.serial.in_waiting > 0:
+                    data = self.serial.read(self.serial.in_waiting)
+                    self.process_data(data)
+                else:
+                    # Si llevamos tiempo con datos en el buffer sin recibir más, procesarlos
+                    if self.buffer and len(self.buffer) >= 8:
+                        time.sleep(0.1)  # Esperar por si llegan más datos
+                        if self.serial.in_waiting == 0:
+                            # No llegaron más datos, procesar lo que tenemos
+                            barcode = self.buffer.strip()
+                            self.buffer = ""
+                            
+                            if self.is_valid_barcode(barcode):
+                                current_time = time.time()
+                                
+                                if barcode == self.last_barcode and (current_time - self.last_scan_time) < self.scan_cooldown:
+                                    print(f"[Scanner] Código duplicado ignorado: {barcode}")
+                                else:
+                                    self.last_barcode = barcode
+                                    self.last_scan_time = current_time
+                                    self.publish_barcode(barcode)
+                
+                time.sleep(0.01)  # Pequeña pausa para no saturar la CPU
+                
+            except Exception as e:
+                print(f"[Scanner] Error en bucle principal: {e}")
+                time.sleep(1)  # Pausa más larga si hay error
+
+    def publish_barcode(self, barcode):
+        """Publicar código de barras a MQTT"""
+        try:
+            # IMPORTANT: Correct message structure with action at top level
+            message = {
+                "action": "barcode_scanned",
+                "source": "barcode_scanner",
+                "data": {
+                    "barcode": barcode
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+
+            # IMPORTANT: Publishing to the correct topic
+            self.client.publish("winefridge/system/status", json.dumps(message))
+            print(f"[Scanner] Publicado código: {barcode}")
+            
+        except Exception as e:
+            print(f"[Scanner] Error publicando a MQTT: {e}")
+
+    def __del__(self):
+        """Limpiar recursos al finalizar"""
+        try:
+            if hasattr(self, 'serial') and self.serial.is_open:
+                self.serial.close()
+                print("[Scanner] Puerto serie cerrado")
+        except:
+            pass
+            
+        try:
+            if hasattr(self, 'client'):
+                self.client.disconnect()
+                print("[Scanner] MQTT desconectado")
+        except:
+            pass
+
+if __name__ == "__main__":
+    try:
+        scanner = BarcodeScanner()
+        scanner.run()
+    except KeyboardInterrupt:
+        print("\n[Scanner] Detenido por usuario")
+    except Exception as e:
+        print(f"[Scanner] Error fatal: {e}")
+        import traceback
+        traceback.print_exc()
