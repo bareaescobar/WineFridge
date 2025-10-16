@@ -1,258 +1,388 @@
-import paho.mqtt.client as mqtt
+#!/usr/bin/env python3
 import json
+import paho.mqtt.client as mqtt
 import time
-import threading
 from datetime import datetime
-import os
-
-# === File Paths ===
-INVENTORY_PATH = "../database/inventory.json"
-CATALOG_PATH = "../database/wine-catalog.json"
-LOG_PATH = "../logs/mqtt.log"
+import threading
 
 class WineFridgeController:
     def __init__(self):
-        self.inventory = self.load_json(INVENTORY_PATH)
-        self.catalog = self.load_json(CATALOG_PATH)
+        # Load databases
+        self.inventory = self.load_json('/home/plasticlab/winefridge/RPI/database/inventory.json')
+        self.catalog = self.load_json('/home/plasticlab/winefridge/RPI/database/wine-catalog.json')
+
+        # Track pending operations
         self.pending_operations = {}
-        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+
+        # Setup MQTT with new API
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
-        self.client.connect("localhost", 1883)
 
-    def on_connect(self, client, userdata, flags, rc):
-        print("[MQTT] Connected with result code", rc)
+        print("[INIT] Connecting to MQTT broker...")
+        self.client.connect("localhost", 1883, 60)
+
+    def load_json(self, filepath):
+        try:
+            with open(filepath, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[ERROR] Loading {filepath}: {e}")
+            return {}
+
+    def save_json(self, filepath, data):
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(data, f, indent=2)
+            print(f"[SAVE] Updated {filepath}")
+        except Exception as e:
+            print(f"[ERROR] Saving {filepath}: {e}")
+
+    def on_connect(self, client, userdata, flags, rc, properties):
+        print(f"[MQTT] Connected with code {rc}")
+        # Subscribe to all relevant topics
         client.subscribe("winefridge/+/status")
+        client.subscribe("winefridge/system/status")
         client.subscribe("winefridge/system/command")
+        print("[MQTT] Subscribed to topics")
 
     def on_message(self, client, userdata, msg):
         try:
+            topic = msg.topic
             message = json.loads(msg.payload.decode())
-            topic_parts = msg.topic.split('/')
-            component = topic_parts[1]
+            action = message.get('action', 'unknown')
+            source = message.get('source', 'unknown')
 
-            self.log_message(msg.topic, message)
+            # Don't log heartbeats to reduce noise
+            if action != 'heartbeat':
+                print(f"[MQTT] {topic} | Action: {action} | Source: {source}")
 
-            if component.startswith("drawer_"):
-                self.handle_drawer_message(component, message)
-            elif component == "lighting":
-                pass  # Handle lighting if needed
-            elif component == "system":
-                self.handle_web_command(message)
+            # CRITICAL: Skip our own messages on system/status to avoid loops
+            if topic == "winefridge/system/status" and source == "mqtt_handler":
+                return
+
+            # Route messages based on topic
+            if topic == "winefridge/system/status":
+                self.handle_system_status(message)
+
+            elif topic == "winefridge/system/command":
+                # IGNORE start_swap bug
+                if action != 'start_swap':
+                    self.handle_system_command(message)
+                elif action == 'start_swap':
+                    print("[DEBUG] Ignoring spurious start_swap")
+
+            elif "drawer_" in topic and "/status" in topic:
+                drawer_id = topic.split('/')[1]
+                if action != 'heartbeat':
+                    self.handle_drawer_status(drawer_id, message)
+
         except Exception as e:
-            print("[ERROR] on_message:", e)
+            print(f"[ERROR] Processing message: {e}")
 
-    # === Handlers ===
+    # <<< BLOQUE DUPLICADO ELIMINADO DE AQUÍ >>>
 
-    def handle_drawer_message(self, drawer_id, message):
-        action = message.get("action", None)
-        data = message.get("data", {})
-        
-        if not action:
-            print(f"[ERROR] No action found in drawer message from {drawer_id}")
+    def handle_system_status(self, message):
+        """Handle barcode scans and other status messages"""
+        action = message.get('action')
+        source = message.get('source')
+
+        # CRITICAL: Don't process our own messages to avoid loops
+        if source == 'mqtt_handler':
             return
 
-        if action == "heartbeat":
-            pass  # You can store last_seen here
-        elif action == "bottle_event":
-            self.process_bottle_event(drawer_id, data)
-        elif action == "error":
-            self.send_to_web("error", data)
+        if action == 'barcode_scanned':
+            barcode = message['data']['barcode']
+            print(f"[BARCODE] Scanned: {barcode}")
 
-    def handle_web_command(self, message):
-        # El frontend envía action dentro de data
-        data = message.get("data", {})
-        action = data.get("action", None)
-        
-        if not action:
-            print("[ERROR] No action found in message")
+            # Check if wine exists in catalog
+            wine = self.catalog.get("wines", {}).get(barcode)
+
+            if wine:
+                print(f"[BARCODE] Wine found: {wine.get('name')}")
+                # Create NEW message with mqtt_handler as source
+                wine_found_msg = {
+                    "action": "barcode_scanned",
+                    "source": "mqtt_handler",  # IMPORTANT: Mark as from us
+                    "data": {
+                        "barcode": barcode,
+                        "wine": wine
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }
+                self.client.publish("winefridge/system/status", json.dumps(wine_found_msg))
+            else:
+                print(f"[BARCODE] Wine NOT in catalog, using default")
+                # Create a default wine entry for demo
+                default_msg = {
+                    "action": "barcode_scanned",
+                    "source": "mqtt_handler",  # IMPORTANT: Mark as from us
+                    "data": {
+                        "barcode": barcode,
+                        "wine": {
+                            "name": "Unknown Wine",
+                            "type": "Red",
+                            "region": "Spain"
+                        }
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }
+                self.client.publish("winefridge/system/status", json.dumps(default_msg))
+
+    def handle_system_command(self, message):
+        """Handle commands from web interface"""
+        action = message.get('action')
+        data = message.get('data', {})
+
+        print(f"[COMMAND] Action: {action}")
+
+        if action == 'start_load':
+            self.start_bottle_load(data)
+
+    def start_bottle_load(self, data):
+        """Start the bottle loading process"""
+        barcode = data.get('barcode', 'unknown')
+        name = data.get('name', 'Unknown Wine')
+
+        print(f"[LOAD] Starting load process for {name} ({barcode})")
+
+        # Find empty position in drawer 3
+        position = self.find_empty_position('drawer_3')
+
+        if not position:
+            print("[ERROR] No empty positions in drawer_3")
+            error_msg = {
+                "action": "load_error",
+                "source": "mqtt_handler",
+                "data": {
+                    "error": "No empty positions available"
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+            self.client.publish("winefridge/system/status", json.dumps(error_msg))
             return
 
-        if action == "start_load":
-            self.start_bottle_loading(data["barcode"])
-        elif action == "start_unload":
-            self.start_bottle_removal(data["position"])
+        print(f"[LOAD] Found empty position: drawer_3, position {position}")
 
-    def start_bottle_loading(self, barcode):
-        print(f"[DEBUG] start_bottle_loading called with barcode: {barcode}")
-        
-        wine = self.catalog.get("wines", {}).get(barcode)
-        print(f"[DEBUG] Wine found: {wine is not None}")
-        
-        if not wine:
-            self.send_to_web("error", {"message": "Unknown wine"})
-            return
-
-        slot = self.find_empty_position()
-        print(f"[DEBUG] Empty slot found: {slot}")
-        
-        if not slot:
-            self.send_to_web("error", {"message": "Fridge full"})
-            return
-
-        drawer, position = slot["drawer"], slot["position"]
-        op_id = f"{drawer}_{position}_{int(time.time())}"
+        # Create operation tracking
+        op_id = f"load_{int(time.time())}"
         self.pending_operations[op_id] = {
-            "type": "load",
-            "barcode": barcode,
-            "drawer": drawer,
-            "position": position,
-            "started": time.time()
+            'type': 'load',
+            'barcode': barcode,
+            'name': name,
+            'drawer': 'drawer_3',
+            'position': position,
+            'timestamp': time.time()
         }
 
-        print(f"[DEBUG] Created pending operation: {op_id}")
-        print(f"[DEBUG] All pending operations: {self.pending_operations}")
-        print(f"[DEBUG] Sending LED command to {drawer} position {position}")
-        
-        self.send_drawer_command(drawer, {
-            "action": "set_leds",
-            "source": "rpi",
-            "data": {
-                "positions": [{"position": position, "color": "#0000FF", "brightness": 100}],
-                "duration_ms": 0
-            }
-        })
+        print(f"[LOAD] Created operation {op_id}")
 
-        print(f"[DEBUG] Sending expect_bottle command")
-        self.send_drawer_command(drawer, {
+        # 1. Send LED command to highlight position
+        led_cmd = {
+            "action": "set_leds",
+            "source": "mqtt_handler",
+            "data": {
+                "positions": [
+                    {"position": position, "color": "#0000FF", "brightness": 100}
+                ]
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        self.client.publish("winefridge/drawer_3/command", json.dumps(led_cmd))
+        print(f"[LOAD] LED command sent for position {position}")
+
+        # 2. Send expect_bottle command
+        expect_cmd = {
             "action": "expect_bottle",
-            "source": "rpi",
+            "source": "mqtt_handler",
             "data": {
                 "position": position,
                 "barcode": barcode,
-                "name": wine["name"],
+                "name": name,
                 "timeout_ms": 30000
-            }
-        })
-
-        print(f"[DEBUG] Sending expect_bottle to web")
-        self.send_to_web("expect_bottle", {
-            "drawer": drawer,
-            "position": position,
-            "wine_name": wine["name"]
-        })
-
-        threading.Timer(30, self.check_timeout, [op_id]).start()
-
-    def process_bottle_event(self, drawer, data):
-        print(f"[DEBUG] process_bottle_event called: drawer={drawer}, data={data}")
-        print(f"[DEBUG] pending_operations: {self.pending_operations}")
-        
-        pos = data["position"]
-        weight = data["weight"]
-        op = self.find_pending_op(drawer, pos)
-        
-        print(f"[DEBUG] Found pending operation: {op}")
-
-        if op and op["type"] == "load":
-            barcode = op["barcode"]
-            wine = self.catalog["wines"].get(barcode, {})
-            
-            print(f"[DEBUG] Processing bottle load: barcode={barcode}, wine={wine.get('name')}")
-            
-            self.inventory["drawers"].setdefault(drawer, {}).setdefault("positions", {})[str(pos)] = {
-                "occupied": True,
-                "barcode": barcode,
-                "name": wine.get("name"),
-                "weight": weight,
-                "placed_date": datetime.now().isoformat(),
-                "aging_days": 0
-            }
-            self.save_json(INVENTORY_PATH, self.inventory)
-            
-            print(f"[DEBUG] Saved to inventory.json")
-
-            self.send_drawer_command(drawer, {
-                "action": "set_leds",
-                "source": "rpi",
-                "data": {
-                    "positions": [{"position": pos, "color": "#00FF00", "brightness": 100}],
-                    "duration_ms": 3000
-                }
-            })
-            
-            print(f"[DEBUG] Sent LED command")
-
-            self.send_to_web("bottle_placed", {
-                "success": True,
-                "drawer": drawer,
-                "position": pos,
-                "wine_name": wine.get("name")
-            })
-            
-            print(f"[DEBUG] Sent bottle_placed to web")
-
-            del self.pending_operations[op["id"]]
-            print(f"[DEBUG] Deleted pending operation")
-        else:
-            print(f"[DEBUG] No matching pending operation found for drawer={drawer}, position={pos}")
-
-    def check_timeout(self, op_id):
-        if op_id in self.pending_operations:
-            op = self.pending_operations.pop(op_id)
-            print(f"[DEBUG] Timeout for operation: {op}")
-            self.send_to_web("error", {
-                "message": f"Bottle placement timed out at {op['drawer']} position {op['position']}"
-            })
-
-    def start_bottle_removal(self, position):
-        # Optional: implement if you support unloading
-        pass
-
-    # === Utility ===
-
-    def find_empty_position(self):
-        drawers = self.inventory.get("drawers", {})
-        for drawer in ["drawer_1", "drawer_2", "drawer_3"]:
-            for pos in range(1, 10):
-                if not drawers.get(drawer, {}).get("positions", {}).get(str(pos), {}).get("occupied", False):
-                    return {"drawer": drawer, "position": pos}
-        return None
-
-    def find_pending_op(self, drawer, pos):
-        for op_id, op in self.pending_operations.items():
-            if op["drawer"] == drawer and op["position"] == pos:
-                op["id"] = op_id
-                return op
-        return None
-
-    def send_drawer_command(self, drawer, cmd):
-        self.client.publish(f"winefridge/{drawer}/command", json.dumps(cmd))
-
-    def send_to_web(self, action, data):
-        self.client.publish("winefridge/system/status", json.dumps({
-            "action": action,
-            "source": "rpi",
-            "data": data,
+            },
             "timestamp": datetime.now().isoformat()
-        }))
+        }
+        self.client.publish("winefridge/drawer_3/command", json.dumps(expect_cmd))
+        print(f"[LOAD] Expect bottle command sent")
 
-    def log_message(self, topic, msg):
+        # 3. Notify web to show drawer position (CHANGED ACTION NAME)
+        web_msg = {
+            "action": "expect_bottle",  # Changed from show_position
+            "source": "mqtt_handler",
+            "data": {
+                "drawer": "drawer_3",
+                "position": position,
+                "wine_name": name
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        self.client.publish("winefridge/system/status", json.dumps(web_msg))
+        print(f"[LOAD] Web notified with expect_bottle")
+
+        # Set timeout
+        threading.Timer(30, self.handle_timeout, [op_id]).start()
+
+    def handle_drawer_status(self, drawer_id, message):
+        """Handle status messages from drawers"""
+        action = message.get('action')
+
+        if action == 'bottle_event':
+            data = message.get('data', {})
+            event = data.get('event')
+            position = data.get('position')
+            weight = data.get('weight', 0)
+
+            print(f"[DRAWER] {drawer_id} position {position}: {event} (weight: {weight}g)")
+
+            if event == 'placed':
+                self.handle_bottle_placed(drawer_id, position, weight)
+
+    def handle_bottle_placed(self, drawer_id, position, weight):
+        """Handle bottle placement detection"""
+        print(f"[PLACED] Processing placement at {drawer_id} position {position}")
+        print(f"[PLACED] Pending operations: {self.pending_operations}")
+
+        # Find matching pending operation
+        found_op = None
+        for op_id, op in list(self.pending_operations.items()):
+            print(f"[PLACED] Checking op {op_id}: drawer={op['drawer']}, pos={op['position']}")
+            if op['drawer'] == drawer_id and op['position'] == position:
+                found_op = (op_id, op)
+                break
+
+        if found_op:
+            op_id, op = found_op
+            print(f"[PLACED] Found matching operation {op_id}")
+
+            # Update inventory
+            self.update_inventory(drawer_id, position, op['barcode'], op['name'], weight)
+
+            # Turn off LED
+            led_off = {
+                "action": "set_leds",
+                "source": "mqtt_handler",
+                "data": {
+                    "positions": []
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps(led_off))
+            print(f"[PLACED] LED turned off")
+
+            # Notify web of success
+            success_msg = {
+                "action": "bottle_placed",
+                "source": "mqtt_handler",
+                "data": {
+                    "success": True,
+                    "drawer": drawer_id,
+                    "position": position,
+                    "barcode": op['barcode'],
+                    "wine_name": op['name'],
+                    "weight": weight
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+            self.client.publish("winefridge/system/status", json.dumps(success_msg))
+            print(f"[PLACED] Success message sent to web")
+
+            # Remove operation
+            del self.pending_operations[op_id]
+            print(f"[PLACED] Operation {op_id} completed and removed")
+        else:
+            print(f"[PLACED] No matching operation found for {drawer_id} position {position}")
+
+    def find_empty_position(self, drawer_id):
+        """Find first empty position in drawer"""
+        drawer = self.inventory.get("drawers", {}).get(drawer_id, {})
+        positions = drawer.get("positions", {})
+
+        # Check positions 1-9
+        for pos in range(1, 10):
+            pos_str = str(pos)
+            if pos_str not in positions or not positions[pos_str].get("occupied", False):
+                return pos
+
+        return None
+
+    def update_inventory(self, drawer_id, position, barcode, name, weight):
+        """Update inventory file"""
+        print(f"[INVENTORY] Updating {drawer_id} position {position}")
+
+        # Reload inventory to get latest state
+        self.inventory = self.load_json('/home/plasticlab/winefridge/RPI/database/inventory.json')
+
+        # Ensure structure exists
+        if "drawers" not in self.inventory:
+            self.inventory["drawers"] = {}
+        if drawer_id not in self.inventory["drawers"]:
+            self.inventory["drawers"][drawer_id] = {"positions": {}}
+        if "positions" not in self.inventory["drawers"][drawer_id]:
+            self.inventory["drawers"][drawer_id]["positions"] = {}
+
+        # Update position
+        self.inventory["drawers"][drawer_id]["positions"][str(position)] = {
+            "occupied": True,
+            "barcode": barcode,
+            "name": name,
+            "weight": weight,
+            "placed_date": datetime.now().isoformat(),
+            "aging_days": 0
+        }
+
+        # Update last_updated
+        self.inventory["last_updated"] = datetime.now().isoformat()
+
+        # Count total bottles
+        total = 0
+        for drawer in self.inventory.get("drawers", {}).values():
+            for pos in drawer.get("positions", {}).values():
+                if pos.get("occupied", False):
+                    total += 1
+        self.inventory["total_bottles"] = total
+
+        # Save to file
+        self.save_json('/home/plasticlab/winefridge/RPI/database/inventory.json', self.inventory)
+        print(f"[INVENTORY] Successfully updated. Total bottles: {total}")
+
+    def handle_timeout(self, op_id):
+        """Handle operation timeout"""
+        if op_id in self.pending_operations:
+            op = self.pending_operations[op_id]
+            print(f"[TIMEOUT] Operation {op_id} timed out")
+
+            # Clear LED
+            led_off = {
+                "action": "set_leds",
+                "source": "mqtt_handler",
+                "data": {"positions": []},
+                "timestamp": datetime.now().isoformat()
+            }
+            self.client.publish(f"winefridge/{op['drawer']}/command", json.dumps(led_off))
+
+            # Notify web
+            timeout_msg = {
+                "action": "bottle_placed",
+                "source": "mqtt_handler",
+                "data": {
+                    "success": False,
+                    "error": "Timeout - bottle not placed"
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+            self.client.publish("winefridge/system/status", json.dumps(timeout_msg))
+
+            del self.pending_operations[op_id]
+
+    def run(self):
+        print("[START] WineFridge MQTT Handler v2.1")
         try:
-            os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-            with open(LOG_PATH, 'a') as f:
-                f.write(f"{datetime.now()} | {topic} | {json.dumps(msg)}\n")
-        except Exception as e:
-            print(f"[ERROR] Failed to log message: {e}")
+            self.client.loop_forever()
+        except KeyboardInterrupt:
+            print("\n[STOP] Shutting down...")
+            self.client.disconnect()
 
-    def load_json(self, path):
-        try:
-            with open(path, 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"[ERROR] Failed to load {path}: {e}")
-            return {}
-
-    def save_json(self, path, data):
-        try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, 'w') as f:
-                json.dump(data, f, indent=2)
-            print(f"[DEBUG] Saved {path} successfully")
-        except Exception as e:
-            print(f"[ERROR] Failed to save {path}: {e}")
-
-# === Start Controller ===
 if __name__ == "__main__":
     controller = WineFridgeController()
-    controller.client.loop_forever()
+    controller.run()

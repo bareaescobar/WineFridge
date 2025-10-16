@@ -3,14 +3,19 @@ module.exports = {
     {
       name: 'mqtt-handler',
       script: 'mqtt_handler.py',
+      cwd: './backend',
       interpreter: '/usr/bin/python3',
-      cwd: './backend'
+      autostart: true,
+      watch: false,
+      max_memory_restart: '200M'
     },
     {
       name: 'barcode-scanner',
       script: 'barcode_scanner.py',
+      cwd: './backend',
       interpreter: '/usr/bin/python3',
-      cwd: './backend'
+      autorestart: true,
+      watch: false
     },
     {
       name: 'web-server',

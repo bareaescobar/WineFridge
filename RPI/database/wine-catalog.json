@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "wines": {
-    "8410337311038": {
+    "8422443001277": {
       "name": "Castaño Rosado Golosa Frescura",
       "winery": "Bodegas Castaño",
       "about_winery": "Bodegas Castaño is a family-run winery with a passion for Monastrell, combining tradition and modernity to create vibrant, character-driven wine.",
@@ -25,7 +25,7 @@
       "img": "/img/wine/Rose/Castano-Rosado-Golosa-Frescura-Monastrell.png",
       "image_url": "/img/wine/Rose/Castano-Rosado-Golosa-Frescura-Monastrell-info-banner-2x.png"
     },
-    "8410337311045": {
+    "8436532094941": {
       "name": "Granza Organic Rosé Wine",
       "winery": "Granza",
       "about_winery": "Granza focuses on organic wines that reflect purity and sustainability in winemaking.",
@@ -49,7 +49,7 @@
       "img": "/img/wine/Rose/Granza-Organic-Rose-Cigales.png",
       "image_url": "/img/wine/Rose/Granza-Organic-Rose-Cigales-info-banner-2x.png"
     },
-    "8410337311052": {
+    "8414825339511": {
       "name": "Alma Atlántica Rosé",
       "winery": "Alma Atlántica",
       "about_winery": "Alma Atlántica celebrates modern Galician wines with a youthful, vibrant twist.",
@@ -73,7 +73,7 @@
       "img": "/img/wine/Rose/Alma-Atlantica-Rose.png",
       "image_url": "/img/wine/Rose/Alma-Atlantica-Rose-info-banner-2x.png"
     },
-    "8410337311069": {
+    "8410591002604": {
       "name": "Cune Rosado",
       "winery": "Cune (CVNE)",
       "about_winery": "Cune (CVNE) blends tradition and innovation, producing wines since 1879.",
@@ -97,7 +97,7 @@
       "img": "/img/wine/Rose/Cune-Rosado.png",
       "image_url": "/img/wine/Rose/Cune-Rosado-info-banner-2x.png"
     },
-    "8410337311076": {
+    "8411543125013": {
       "name": "Viña Pomal Rosado",
       "winery": "Viña Pomal",
       "about_winery": "Viña Pomal represents the classic Rioja spirit with over a century of expertise.",
@@ -121,7 +121,7 @@
       "img": "/img/wine/Rose/Viña-Pomal-Rosado.png",
       "image_url": "/img/wine/Rose/Viña-Pomal-Rosado-info-banner-2x.png"
     },
-    "8410337311083": {
+    "8420342072022": {
       "name": "Protos Clarete Rosé Wine",
       "winery": "Protos",
       "about_winery": "Protos combines tradition and excellence, rooted in Spain’s prestigious Ribera del Duero.",
@@ -145,7 +145,7 @@
       "img": "/img/wine/Rose/Protos-Clarete-Rose.png",
       "image_url": "/img/wine/Rose/Protos-Clarete-Rose-info-banner-2x.png"
     },
-    "8410337311090": {
+    "8410113009005": {
       "name": "Torres Viña Esmeralda Rosé",
       "winery": "Torres",
       "about_winery": "Torres is a globally respected family winery, known for its innovation and environmental commitment.",
@@ -169,7 +169,7 @@
       "img": "/img/wine/Rose/Torres-Vina-Esmeralda-Rose.png",
       "image_url": "/img/wine/Rose/Torres-Vina-Esmeralda-Rose-info-banner-2x.png"
     },
-    "8410337311106": {
+    "8410337325035": {
       "name": "Montecillo Rosé",
       "winery": "Montecillo",
       "about_winery": "Montecillo is one of Rioja’s oldest wineries, committed to heritage and high-quality winemaking.",
@@ -193,7 +193,7 @@
       "img": "/img/wine/Rose/Montecillo-Rose-Rioja.png",
       "image_url": "/img/wine/Rose/Montecillo-Rose-Rioja-info-banner-2x.png"
     },
-    "8410337311113": {
+    "8414601138383": {
       "name": "Fidencio Rosado",
       "winery": "Bodegas Finca La Blanca",
       "about_winery": "Produced by Bodegas Finca La Blanca, a family-run estate with a tradition of crafting approachable wines that highlight the purity of their native region.",
@@ -217,7 +217,7 @@
       "img": "/img/wine/Rose/Fidencio-Rosado.png",
       "image_url": "/img/wine/Rose/Fidencio-Rosado-info-banner-2x.png"
     },
-    "8410337311120": {
+    "8414219001109": {
       "name": "Veliterra Rueda Verdejo",
       "winery": "Veliterra",
       "about_winery": "Veliterra focuses on expressive varietals from traditional Spanish regions, offering freshness and authenticity in every bottle.",
@@ -241,7 +241,7 @@
       "img": "/img/wine/White/Veliterra-Rueda-Verdejo.png",
       "image_url": "/img/wine/White/Veliterra-Rueda-Verdejo-info-banner-2x.png"
     },
-    "8410337311137": {
+    "8414219063213": {
       "name": "CUATRO RAYAS Cantarranas Verdejo",
       "winery": "Cuatro Rayas",
       "about_winery": "Cuatro Rayas is a cooperative with deep roots in Rueda, producing consistent and expressive Verdejos.",
@@ -265,7 +265,7 @@
       "img": "/img/wine/White/Cuatro-Rayas-Cantarranas-Verdejo.png",
       "image_url": "/img/wine/White/Cuatro-Rayas-Cantarranas-Verdejo-info-banner-2x.png"
     },
-    "8410337311144": {
+    "8413423380017": {
       "name": "Ramón Bilbao Verdejo",
       "winery": "Ramón Bilbao",
       "about_winery": "Ramón Bilbao combines innovation and tradition to produce expressive wines with personality.",
@@ -289,7 +289,7 @@
       "img": "/img/wine/White/Ramon-Bilbao-Verdejo.png",
       "image_url": "/img/wine/White/Ramon-Bilbao-Verdejo-info-banner-2x.png"
     },
-    "8410337311151": {
+    "8414219001000": {
       "name": "CUATRO RAYAS Verdejo Vendimia Nocturna",
       "winery": "Cuatro Rayas",
       "about_winery": "Cuatro Rayas specializes in Verdejo, with modern techniques and a sustainable focus.",
@@ -313,7 +313,7 @@
       "img": "/img/wine/White/Quatro-Rayas-Verdejo-Vendimia-Nocturna.png",
       "image_url": "/img/wine/White/Quatro-Rayas-Verdejo-Vendimia-Nocturna-info-banner-2x.png"
     },
-    "8410337311168": {
+    "8410310603501": {
       "name": "Hoya de Cadenas Chardonnay Sauvignon Blanc",
       "winery": "Hoya de Cadenas",
       "about_winery": "Hoya de Cadenas is known for combining Mediterranean terroir with innovative techniques.",
@@ -337,7 +337,7 @@
       "img": "/img/wine/White/Hoya-De-Cadenas-Chardonnay-Sauvingon-Blanc.png",
       "image_url": "/img/wine/White/Hoya-De-Cadenas-Chardonnay-Sauvingon-Blanc-info-banner-2x.png"
     },
-    "8410337311175": {
+    "8410113556776": {
       "name": "Celeste Verdejo",
       "winery": "Celeste",
       "about_winery": "Part of the Torres family, Celeste wines are inspired by the night sky and mountain vineyards.",
@@ -361,7 +361,7 @@
       "img": "/img/wine/White/Pago-del-Cielo-Celeste-Verdejo.png",
       "image_url": "/img/wine/White/Pago-del-Cielo-Celeste-Verdejo-info-banner-2x.png"
     },
-    "8410337311182": {
+    "8414219000737": {
       "name": "CUATRO RAYAS Pampano Organic Afrutado Verdejo",
       "winery": "Cuatro Rayas",
       "about_winery": "Cuatro Rayas embraces sustainability, producing wines that are pure and eco-friendly.",
@@ -385,7 +385,7 @@
       "img": "/img/wine/White/CUATRO-RAYAS-Pampano-Organic-Afrutado-Verdejo.png",
       "image_url": "/img/wine/White/CUATRO-RAYAS-Pampano-Organic-Afrutado-Verdejo-info-banner-2x.png"
     },
-    "8410337311199": {
+    "B08KSSB4D2": {
       "name": "Señorío de los Llanos Verdejo",
       "winery": "Señorío de los Llanos",
       "about_winery": "Señorío de los Llanos produces value-driven wines with regional identity.",
@@ -409,7 +409,7 @@
       "img": "/img/wine/White/Senorio-de-Los-Llanos-Verdejo.png",
       "image_url": "/img/wine/White/Senorio-de-Los-Llanos-Verdejo-info-banner-2x.png"
     },
-    "8410337311205": {
+    "8410310616907": {
       "name": "Finca del Mar Verdejo",
       "winery": "Finca del Mar",
       "about_winery": "Finca del Mar blends sea breeze and sun in expressive, easy-drinking wines.",
@@ -433,7 +433,7 @@
       "img": "/img/wine/White/Finca-del-Mar-Verdejo.png",
       "image_url": "/img/wine/White/Finca-del-Mar-Verdejo-info-banner-2x.png"
     },
-    "8410337311212": {
+    "8410337311038": {
       "name": "Viña Cumbrero Crianza",
       "winery": "Viña Cumbrero",
       "about_winery": "Traditional Rioja producer focused on authentic barrel-aged reds.",
@@ -457,7 +457,7 @@
       "img": "/img/wine/Red/Vina-Cumbrero-Crianza.png",
       "image_url": "/img/wine/Red/Vina-Cumbrero-Crianza-info-banner-2x.png"
     },
-    "8410337311229": {
+    "8420906059308": {
       "name": "Montesierra Young Red Wine",
       "winery": "Montesierra",
       "about_winery": "Focuses on expressive, fruit-forward young wines.",
@@ -481,7 +481,7 @@
       "img": "/img/wine/Red/MonteSierra-Young.png",
       "image_url": "/img/wine/Red/MonteSierra-Young-info-banner-2x.png"
     },
-    "8410337311236": {
+    "8410310606168": {
       "name": "Hoya de Cadenas Cabernet Sauvignon Crianza",
       "winery": "Hoya de Cadenas",
       "about_winery": "Combines modern techniques and Mediterranean tradition.",
@@ -505,7 +505,7 @@
       "img": "/img/wine/Red/Hoya-De-Cadenas-Cabarnet-Suavignon-Crianza.png",
       "image_url": "/img/wine/Red/Hoya-De-Cadenas-Cabarnet-Suavignon-Crianza-info-banner-2x.png"
     },
-    "8410337311243": {
+    "8410261111025": {
       "name": "Pata Negra Crianza",
       "winery": "Pata Negra",
       "about_winery": "Known for expressive, powerful reds.",
@@ -529,7 +529,7 @@
       "img": "/img/wine/Red/Pata-Negra-Crianza.png",
       "image_url": "/img/wine/Red/Pata-Negra-Crianza-info-banner-2x.png"
     },
-    "8410337311250": {
+    "8421216194451": {
       "name": "Laudum Monastrell Roble",
       "winery": "Bodegas Bocopa",
       "about_winery": "Bodegas Bocopa blends innovation and tradition.",
@@ -553,7 +553,7 @@
       "img": "/img/wine/Red/Laudium-Monastrell-Roble.png",
       "image_url": "/img/wine/Red/Laudium-Monastrell-Roble-info-banner-2x.png"
     },
-    "8410337311267": {
+    "8411528001301": {
       "name": "Bodegas Aragonesas Solo Syrah Tirio",
       "winery": "Bodegas Aragonesas",
       "about_winery": "Bodegas Aragonesas highlights varietal purity.",
@@ -577,7 +577,7 @@
       "img": "/img/wine/Red/Bodegas Aragonesas-Solo-Syrah-Tirio.png",
       "image_url": "/img/wine/Red/Bodegas Aragonesas-Solo-Syrah-Tirio-info-banner-2x.png"
     },
-    "8410337311274": {
+    "8410310604249": {
       "name": "Finca del Mar Cabernet Sauvignon Crianza",
       "winery": "Finca del Mar",
       "about_winery": "Inspired by the Mediterranean sea and sun.",
@@ -601,7 +601,7 @@
       "img": "/img/wine/Red/Finca-del-Mar-Cabernet-Sauvignon-Crianza.png",
       "image_url": "/img/wine/Red/Finca-del-Mar-Cabernet-Sauvignon-Crianza-info-banner-2x.png"
     },
-    "8410337311281": {
+    "8410415520628": {
       "name": "Señorío de los Llanos Reserva",
       "winery": "Señorío de los Llanos",
       "about_winery": "Traditional and balanced winemaking.",
@@ -625,7 +625,7 @@
       "img": "/img/wine/Red/Senorio-de-los-Llanos-Reserva.png",
       "image_url": "/img/wine/Red/Senorio-de-los-Llanos-Reserva-info-banner-2x.png"
     },
-    "8410337311298": {
+    "8420209033869": {
       "name": "Silanus Young Red",
       "winery": "Silanus",
       "about_winery": "Vibrant wines showcasing Extremadura’s terroir.",
@@ -651,3 +651,4 @@
     }
   }
 }
+
