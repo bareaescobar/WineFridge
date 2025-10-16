@@ -21,16 +21,16 @@
         "2": {
           "occupied": true,
           "barcode": "8410337311281",
-          "name": "Señorío de los Llanos Reserva",
+          "name": "Se\u00f1or\u00edo de los Llanos Reserva",
           "weight": 1120,
           "placed_date": "2025-06-15T12:00:00Z",
           "aging_days": 2
         },
         "3": {
-          "occupied": false
+          "occupied": true
         },
         "4": {
-          "occupied": false
+          "occupied": true
         },
         "5": {
           "occupied": true,
@@ -49,13 +49,13 @@
           "aging_days": 2
         },
         "7": {
-          "occupied": false
+          "occupied": true
         },
         "8": {
-          "occupied": false
+          "occupied": true
         },
         "9": {
-          "occupied": false
+          "occupied": true
         }
       }
     },
@@ -74,10 +74,10 @@
           "aging_days": 2
         },
         "2": {
-          "occupied": false
+          "occupied": true
         },
         "3": {
-          "occupied": false
+          "occupied": true
         },
         "4": {
           "occupied": true,
@@ -88,19 +88,19 @@
           "aging_days": 3
         },
         "5": {
-          "occupied": false
+          "occupied": true
         },
         "6": {
-          "occupied": false
+          "occupied": true
         },
         "7": {
-          "occupied": false
+          "occupied": true
         },
         "8": {
-          "occupied": false
+          "occupied": true
         },
         "9": {
-          "occupied": false
+          "occupied": true
         }
       }
     },
@@ -111,10 +111,20 @@
       "mode": "red",
       "positions": {
         "1": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8410337311144",
+          "name": "Ram\u00f3n Bilbao Verdejo",
+          "weight": 160.4505,
+          "placed_date": "2025-10-15T17:25:43.983786",
+          "aging_days": 0
         },
         "2": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8420209033869",
+          "name": "Silanus Young Red",
+          "weight": 270.7095,
+          "placed_date": "2025-10-16T12:33:22.399882",
+          "aging_days": 0
         },
         "3": {
           "occupied": false
@@ -131,7 +141,7 @@
         "7": {
           "occupied": true,
           "barcode": "8410337311212",
-          "name": "Viña Cumbrero Crianza",
+          "name": "Vi\u00f1a Cumbrero Crianza",
           "weight": 1120,
           "placed_date": "2025-06-15T12:00:00Z",
           "aging_days": 2
@@ -166,7 +176,7 @@
         "2": {
           "occupied": true,
           "barcode": "8410337311199",
-          "name": "Señorío de los Llanos Verdejo",
+          "name": "Se\u00f1or\u00edo de los Llanos Verdejo",
           "weight": 1100,
           "placed_date": "2025-06-12T08:30:00Z",
           "aging_days": 5
@@ -253,7 +263,7 @@
         "1": {
           "occupied": true,
           "barcode": "8410337311144",
-          "name": "Ramón Bilbao Verdejo",
+          "name": "Ram\u00f3n Bilbao Verdejo",
           "weight": 1100,
           "placed_date": "2025-06-12T08:30:00Z",
           "aging_days": 5
@@ -303,7 +313,7 @@
         "1": {
           "occupied": true,
           "barcode": "8410337311083",
-          "name": "Protos Clarete Rosé Wine",
+          "name": "Protos Clarete Ros\u00e9 Wine",
           "weight": 1050,
           "placed_date": "2025-06-16T09:00:00Z",
           "aging_days": 1
@@ -311,7 +321,7 @@
         "2": {
           "occupied": true,
           "barcode": "8410337311090",
-          "name": "Torres Viña Esmeralda Rosé",
+          "name": "Torres Vi\u00f1a Esmeralda Ros\u00e9",
           "weight": 1170,
           "placed_date": "2025-06-11T18:20:00Z",
           "aging_days": 6
@@ -356,7 +366,7 @@
         "2": {
           "occupied": true,
           "barcode": "8410337311106",
-          "name": "Montecillo Rosé",
+          "name": "Montecillo Ros\u00e9",
           "weight": 1170,
           "placed_date": "2025-06-11T18:20:00Z",
           "aging_days": 6
@@ -393,7 +403,7 @@
         "1": {
           "occupied": true,
           "barcode": "8410337311038",
-          "name": "Castaño Rosado Golosa Frescura",
+          "name": "Casta\u00f1o Rosado Golosa Frescura",
           "weight": 1050,
           "placed_date": "2025-06-16T09:00:00Z",
           "aging_days": 1
@@ -401,7 +411,7 @@
         "2": {
           "occupied": true,
           "barcode": "8410337311045",
-          "name": "Granza Organic Rosé Wine",
+          "name": "Granza Organic Ros\u00e9 Wine",
           "weight": 1170,
           "placed_date": "2025-06-11T18:20:00Z",
           "aging_days": 6
@@ -409,7 +419,7 @@
         "3": {
           "occupied": true,
           "barcode": "8410337311052",
-          "name": "Alma Atlántica Rosé",
+          "name": "Alma Atl\u00e1ntica Ros\u00e9",
           "weight": 1170,
           "placed_date": "2025-06-11T18:20:00Z",
           "aging_days": 6
