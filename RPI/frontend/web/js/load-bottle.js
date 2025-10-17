@@ -16,11 +16,8 @@ const loadBottleInfoModal = document.getElementById('load-bottle-info-modal')
 const loadBottleDrawerModal = document.getElementById('load-bottle-drawer-modal')
 const loadBottleSuccessModal = document.getElementById('load-bottle-success-modal')
 const loadBottleErrorModal = document.getElementById('load-bottle-error-modal')
-// const editBottleModal = document.getElementById('edit-bottle-info-modal')
-// const newBottleInfoModal = document.getElementById('new-bottle-info-modal')
 
 const scanCircle = loadBottleWelcomeModal.querySelector('.processing')
-// const errorModalTitle = loadBottleErrorModal.querySelector('.modal-title')
 
 const port = 3000
 let scannedBottle = null
@@ -30,10 +27,10 @@ const modalActions = {
     scanCircle.classList.add('active')
     loadBottleInfoModal.classList.remove('active')
     const payload = {
-      timestamp: new Date().toISOString(),
+      action: 'start_load',
       source: 'web',
+      timestamp: new Date().toISOString(),
       data: {
-        action: 'start_load',
         barcode: scannedBottle.barcode,
         name: scannedBottle.name,
       },
@@ -53,10 +50,10 @@ const mqttActions = {
     const locations = extracted[data.barcode]?.locations
     if (locations) {
       const payload = {
-        timestamp: new Date().toISOString(),
+        action: 'start_return',
         source: 'web',
+        timestamp: new Date().toISOString(),
         data: {
-          action: 'start_return',
           barcode: data.barcode,
           locations,
         },
