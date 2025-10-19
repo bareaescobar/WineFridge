@@ -18,9 +18,9 @@ import { BROKER_URL } from './constants/mqtt-variables'
 import { renderFridgeCapacity, renderZone } from './helpers/templates'
 
 const zonesConfig = [
-  { drawers: ['drawer_1', 'drawer_2', 'drawer_3'], key: 'upper' },
-  { drawers: ['drawer_4', 'drawer_5', 'drawer_6'], key: 'middle' },
-  { drawers: ['drawer_7', 'drawer_8', 'drawer_9'], key: 'lower' },
+  { drawers: ['drawer_9', 'drawer_8', 'drawer_7'], key: 'upper' },
+  { drawers: ['drawer_6', 'drawer_5', 'drawer_4'], key: 'middle' },
+  { drawers: ['drawer_3', 'drawer_2', 'drawer_1'], key: 'lower' },
 ]
 
 const port = 3000
