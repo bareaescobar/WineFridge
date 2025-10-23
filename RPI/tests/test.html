@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Connection Debugger</title>
+    <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .status.connected { background: #0e4429; }
+        .status.disconnected { background: #8b1e1e; }
+        .status.pending { background: #614700; }
+        .message {
+            background: #2d2d30;
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #007acc;
+            border-radius: 3px;
+        }
+        .message.sent { border-left-color: #4ec9b0; }
+        .message.received { border-left-color: #ce9178; }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover { background: #1177bb; }
+        #messages {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .timestamp {
+            color: #808080;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 MQTT WebSocket Debugger</h1>
+    
+    <div id="status" class="status disconnected">
+        Status: Disconnected
+    </div>
+
+    <div>
+        <button onclick="testConnection()">Test Connection</button>
+        <button onclick="sendBarcodeScan()">Send Test Barcode</button>
+        <button onclick="clearMessages()">Clear Log</button>
+    </div>
+
+    <h2>Connection Info:</h2>
+    <div id="info" style="background: #2d2d30; padding: 10px; border-radius: 5px;">
+        Attempting to connect to: ws://localhost:9001
+    </div>
+
+    <h2>Message Log:</h2>
+    <div id="messages"></div>
+
+    <script>
+        let client = null;
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+        const infoDiv = document.getElementById('info');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${type}`;
+            msgDiv.innerHTML = `
+                <span class="timestamp">[${timestamp}]</span> ${message}
+            `;
+            messagesDiv.insertBefore(msgDiv, messagesDiv.firstChild);
+        }
+
+        function updateStatus(status, className) {
+            statusDiv.textContent = `Status: ${status}`;
+            statusDiv.className = `status ${className}`;
+        }
+
+        function testConnection() {
+            log('🔌 Attempting to connect to MQTT broker...', 'sent');
+            updateStatus('Connecting...', 'pending');
+
+            // Try to connect
+            client = mqtt.connect('ws://localhost:9001', {
+                clientId: 'debug-client-' + Math.random().toString(16).substr(2, 8),
+                reconnectPeriod: 5000
+            });
+
+            client.on('connect', () => {
+                log('✅ Connected to MQTT broker!', 'received');
+                updateStatus('Connected', 'connected');
+                
+                // Subscribe to system status
+                client.subscribe('winefridge/system/status', (err) => {
+                    if (err) {
+                        log('❌ Failed to subscribe: ' + err.message, 'received');
+                    } else {
+                        log('✅ Subscribed to winefridge/system/status', 'received');
+                    }
+                });
+
+                // Show connection details
+                infoDiv.innerHTML = `
+                    <strong>✅ Connection Successful!</strong><br>
+                    Broker: ws://localhost:9001<br>
+                    Client ID: ${client.options.clientId}<br>
+                    Subscribed to: winefridge/system/status
+                `;
+            });
+
+            client.on('error', (err) => {
+                log('❌ Connection error: ' + err.message, 'received');
+                updateStatus('Error', 'disconnected');
+                
+                infoDiv.innerHTML = `
+                    <strong>❌ Connection Failed!</strong><br>
+                    Error: ${err.message}<br><br>
+                    <strong>Troubleshooting:</strong><br>
+                    1. Check if Mosquitto is running: <code>sudo systemctl status mosquitto</code><br>
+                    2. Check WebSocket config in: <code>/etc/mosquitto/conf.d/websocket.conf</code><br>
+                    3. Verify port 9001 is listening: <code>sudo netstat -tlnp | grep 9001</code>
+                `;
+            });
+
+            client.on('close', () => {
+                log('🔌 Connection closed', 'info');
+                updateStatus('Disconnected', 'disconnected');
+            });
+
+            client.on('message', (topic, message) => {
+                const msgStr = message.toString();
+                log(`📨 Received on ${topic}:<br><pre>${JSON.stringify(JSON.parse(msgStr), null, 2)}</pre>`, 'received');
+            });
+        }
+
+        function sendBarcodeScan() {
+            if (!client || !client.connected) {
+                log('❌ Not connected to MQTT broker', 'sent');
+                return;
+            }
+
+            const testMessage = {
+                action: "barcode_scanned",
+                source: "debug_client",
+                data: {
+                    barcode: "8420209033869"
+                },
+                timestamp: new Date().toISOString()
+            };
+
+            client.publish('winefridge/system/status', JSON.stringify(testMessage), (err) => {
+                if (err) {
+                    log('❌ Failed to send: ' + err.message, 'sent');
+                } else {
+                    log(`📤 Sent barcode scan:<br><pre>${JSON.stringify(testMessage, null, 2)}</pre>`, 'sent');
+                }
+            });
+        }
+
+        function clearMessages() {
+            messagesDiv.innerHTML = '';
+        }
+
+        // Auto-connect on load
+        window.onload = () => {
+            log('🚀 Debug tool loaded', 'info');
+            testConnection();
+        };
+    </script>
+</body>
+</html>

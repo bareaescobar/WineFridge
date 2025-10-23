@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "name": "Lounge Fridge",
-  "last_updated": "2025-10-16T18:02:23.343934",
+  "last_updated": "2025-10-17T14:41:25.238284",
   "total_bottles": 37,
   "drawers": {
     "drawer_1": {
@@ -111,16 +111,21 @@
       "mode": "red",
       "positions": {
         "1": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8420209033869",
+          "name": "Silanus Young Red",
+          "weight": 726.1868,
+          "placed_date": "2025-10-17T14:41:25.238266",
+          "aging_days": 0
         },
         "2": {
-          "occupied": false
+          "occupied": true
         },
         "3": {
-          "occupied": false
+          "occupied": true
         },
         "4": {
-          "occupied": false
+          "occupied": true
         },
         "5": {
           "occupied": false
@@ -145,7 +150,7 @@
           "aging_days": 3
         },
         "9": {
-          "occupied": false
+          "occupied": true
         }
       }
     },
