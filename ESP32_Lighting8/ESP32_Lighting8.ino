@@ -13,13 +13,13 @@
 #include "esp_task_wdt.h"
 
 // ==================== CONFIGURATION ====================
-#define LIGHTING_ID "lighting_2"      // Controller ID (physical location: drawer 2)
+#define LIGHTING_ID "lighting_8"      // Controller ID (physical location: drawer 2)
 #define FIRMWARE_VERSION "2.6.0"
 
 // This controller manages:
-#define FIRST_DRAWER 1          // Drawer 2
-#define SECOND_DRAWER 2         // Drawer 1  
-#define ZONE_NUMBER 1           // Zone 1 (upper zone)
+#define FIRST_DRAWER 8          // Drawer 2
+#define SECOND_DRAWER 9         // Drawer 1  
+#define ZONE_NUMBER 3           // Zone 1 (upper zone)
 
 // Network
 #define WIFI_SSID "MOVISTAR-WIFI6-65F8"
