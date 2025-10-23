@@ -168,7 +168,7 @@ const mqttActions = {
 connectMQTT({ host: BROKER_URL, options: { clientId: 'unauthorized-unload' } })
 subscribe(TOPICS.RPI_TO_WEB_EVENT, (msg) => handleMQTTMessage(msg, mqttActions))
 
-publish(
-  TOPICS.WEB_TO_RPI_COMMAND,
-  JSON.stringify({ action: 'start_swap', source: 'ui', timestamp: new Date().toISOString() }),
-)
+//publish(
+//  TOPICS.WEB_TO_RPI_COMMAND,
+//  JSON.stringify({ action: 'start_swap', source: 'ui', timestamp: new Date().toISOString() }),
+//)
