@@ -1,8 +1,8 @@
 {
   "version": "1.0",
   "name": "Lounge Fridge",
-  "last_updated": "2025-10-16T18:02:23.343934",
-  "total_bottles": 37,
+  "last_updated": "2025-10-23T13:02:28.205848",
+  "total_bottles": 25,
   "drawers": {
     "drawer_1": {
       "zone": "Lower",
@@ -127,7 +127,12 @@
           "aging_days": 6
         },
         "3": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8410310606168",
+          "name": "Hoya de Cadenas Cabernet Sauvignon Crianza",
+          "weight": 100,
+          "placed_date": "2025-10-23T13:02:28.205828",
+          "aging_days": 0
         },
         "4": {
           "occupied": false
@@ -354,10 +359,10 @@
           "aging_days": 2
         },
         "2": {
-          "occupied": true
+          "occupied": false
         },
         "3": {
-          "occupied": true
+          "occupied": false
         },
         "4": {
           "occupied": true,
@@ -368,19 +373,19 @@
           "aging_days": 3
         },
         "5": {
-          "occupied": true
+          "occupied": false
         },
         "6": {
-          "occupied": true
+          "occupied": false
         },
         "7": {
-          "occupied": true
+          "occupied": false
         },
         "8": {
-          "occupied": true
+          "occupied": false
         },
         "9": {
-          "occupied": true
+          "occupied": false
         }
       }
     },
@@ -407,10 +412,10 @@
           "aging_days": 2
         },
         "3": {
-          "occupied": true
+          "occupied": false
         },
         "4": {
-          "occupied": true
+          "occupied": false
         },
         "5": {
           "occupied": true,
@@ -429,13 +434,13 @@
           "aging_days": 2
         },
         "7": {
-          "occupied": true
+          "occupied": false
         },
         "8": {
-          "occupied": true
+          "occupied": false
         },
         "9": {
-          "occupied": true
+          "occupied": false
         }
       }
     }
