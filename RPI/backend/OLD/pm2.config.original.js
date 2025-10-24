@@ -10,6 +10,14 @@ module.exports = {
       max_memory_restart: '200M'
     },
     {
+      name: 'barcode-scanner',
+      script: 'barcode_scanner.py',
+      cwd: './backend',
+      interpreter: '/usr/bin/python3',
+      autorestart: true,
+      watch: false
+    },
+    {
       name: 'web-server',
       script: 'server.cjs',
       cwd: './frontend/backend',

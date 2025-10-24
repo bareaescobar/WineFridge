@@ -1,8 +1,8 @@
 {
   "version": "1.0",
   "name": "Lounge Fridge",
-  "last_updated": "2025-10-23T13:02:28.205848",
-  "total_bottles": 25,
+  "last_updated": "2025-10-24T11:24:42.225978",
+  "total_bottles": 28,
   "drawers": {
     "drawer_1": {
       "zone": "Lower",
@@ -128,20 +128,35 @@
         },
         "3": {
           "occupied": true,
-          "barcode": "8410310606168",
-          "name": "Hoya de Cadenas Cabernet Sauvignon Crianza",
+          "barcode": "8410337311038",
+          "name": "Vi\u00f1a Cumbrero Crianza",
           "weight": 100,
-          "placed_date": "2025-10-23T13:02:28.205828",
+          "placed_date": "2025-10-23T17:05:14.696404",
           "aging_days": 0
         },
         "4": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8414219001109",
+          "name": "Veliterra Rueda Verdejo",
+          "weight": 100,
+          "placed_date": "2025-10-24T11:21:03.089272",
+          "aging_days": 0
         },
         "5": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "B08KSSB4D2",
+          "name": "Se\u00f1or\u00edo de los Llanos Verdejo",
+          "weight": 2635.9,
+          "placed_date": "2025-10-24T11:21:58.510796",
+          "aging_days": 0
         },
         "6": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8411528001301",
+          "name": "Bodegas Aragonesas Solo Syrah Tirio",
+          "weight": 281.1,
+          "placed_date": "2025-10-24T11:23:13.988049",
+          "aging_days": 0
         },
         "7": {
           "occupied": false
