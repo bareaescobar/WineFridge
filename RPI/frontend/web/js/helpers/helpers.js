@@ -431,8 +431,11 @@ export function updateBottleInfoModalWithPosition(data, positions, container) {
     }
   })
 
+  const typeOfWyne = data.type.toLowerCase()
+  const drawerEl = modal.querySelector('.drawer-position')
   const ellipses = modal.querySelectorAll('.drawer-position ellipse')
   ellipses.forEach((e) => e.classList.remove('active'))
+  drawerEl.classList.add(typeOfWyne)
 
   positions.forEach((pos) => {
     const index = Number(pos.position) - 1
@@ -445,7 +448,7 @@ export function updateBottleInfoModalWithPosition(data, positions, container) {
   container.appendChild(modal)
 }
 
-export function getBottleDetails(barcode) {
+export function getBottleDetails(barcode, inventory) {
   return Object.entries(inventory.drawers)
     .flatMap(([drawer, data]) =>
       Object.entries(data.positions).map(([position, bottleInfo]) => ({

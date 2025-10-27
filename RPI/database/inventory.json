@@ -8,7 +8,7 @@
       "zone": "Lower",
       "temperature": 17,
       "humidity": 60,
-      "mode": "dessert",
+      "mode": "rose",
       "positions": {
         "1": {
           "occupied": true,
@@ -63,7 +63,7 @@
       "zone": "Lower",
       "temperature": 17,
       "humidity": 60,
-      "mode": "dessert",
+      "mode": "rose",
       "positions": {
         "1": {
           "occupied": true,
@@ -108,7 +108,7 @@
       "zone": "Lower",
       "temperature": 17,
       "humidity": 60,
-      "mode": "dessert",
+      "mode": "rose",
       "positions": {
         "1": {
           "occupied": true,
