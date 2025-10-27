@@ -8,11 +8,11 @@
       "zone": "Lower",
       "temperature": 17,
       "humidity": 60,
-      "mode": "dessert",
+      "mode": "rose",
       "positions": {
         "1": {
           "occupied": true,
-          "barcode": "8410337311038",
+          "barcode": "8422443001277",
           "name": "Casta\u00f1o Rosado Golosa Frescura",
           "weight": 1050,
           "placed_date": "2025-06-16T09:00:00Z",
@@ -20,7 +20,7 @@
         },
         "2": {
           "occupied": true,
-          "barcode": "8410337311045",
+          "barcode": "8436532094941",
           "name": "Granza Organic Ros\u00e9 Wine",
           "weight": 1170,
           "placed_date": "2025-06-11T18:20:00Z",
@@ -28,7 +28,7 @@
         },
         "3": {
           "occupied": true,
-          "barcode": "8410337311052",
+          "barcode": "8414825339511",
           "name": "Alma Atl\u00e1ntica Ros\u00e9",
           "weight": 1170,
           "placed_date": "2025-06-11T18:20:00Z",
@@ -36,7 +36,7 @@
         },
         "4": {
           "occupied": true,
-          "barcode": "8410337311069",
+          "barcode": "8410591002604",
           "name": "Cune Rosado",
           "weight": 1170,
           "placed_date": "2025-06-11T18:20:00Z",
@@ -63,11 +63,11 @@
       "zone": "Lower",
       "temperature": 17,
       "humidity": 60,
-      "mode": "dessert",
+      "mode": "rose",
       "positions": {
         "1": {
           "occupied": true,
-          "barcode": "8410337311113",
+          "barcode": "8414601138383",
           "name": "Fidencio Rosado",
           "weight": 1050,
           "placed_date": "2025-06-16T09:00:00Z",
@@ -75,7 +75,7 @@
         },
         "2": {
           "occupied": true,
-          "barcode": "8410337311106",
+          "barcode": "8410337325035",
           "name": "Montecillo Ros\u00e9",
           "weight": 1170,
           "placed_date": "2025-06-11T18:20:00Z",
@@ -108,11 +108,11 @@
       "zone": "Lower",
       "temperature": 17,
       "humidity": 60,
-      "mode": "dessert",
+      "mode": "rose",
       "positions": {
         "1": {
           "occupied": true,
-          "barcode": "8410337311083",
+          "barcode": "8420342072022",
           "name": "Protos Clarete Ros\u00e9 Wine",
           "weight": 1050,
           "placed_date": "2025-06-16T09:00:00Z",
@@ -120,7 +120,7 @@
         },
         "2": {
           "occupied": true,
-          "barcode": "8410337311090",
+          "barcode": "8410113009005",
           "name": "Torres Vi\u00f1a Esmeralda Ros\u00e9",
           "weight": 1170,
           "placed_date": "2025-06-11T18:20:00Z",
@@ -183,7 +183,7 @@
       "positions": {
         "1": {
           "occupied": true,
-          "barcode": "8410337311144",
+          "barcode": "8413423380017",
           "name": "Ram\u00f3n Bilbao Verdejo",
           "weight": 1100,
           "placed_date": "2025-06-12T08:30:00Z",
@@ -203,7 +203,7 @@
         },
         "6": {
           "occupied": true,
-          "barcode": "8410337311151",
+          "barcode": "8414219001000",
           "name": "CUATRO RAYAS Verdejo Vendimia Nocturna",
           "weight": 1100,
           "placed_date": "2025-06-12T08:30:00Z",
@@ -211,7 +211,7 @@
         },
         "7": {
           "occupied": true,
-          "barcode": "8410337311137",
+          "barcode": "8414219063213",
           "name": "CUATRO RAYAS Cantarranas Verdejo",
           "weight": 1185,
           "placed_date": "2025-06-10T10:00:00Z",
@@ -233,7 +233,7 @@
       "positions": {
         "1": {
           "occupied": true,
-          "barcode": "8410337311168",
+          "barcode": "8410310603501",
           "name": "Hoya de Cadenas Chardonnay Sauvignon Blanc",
           "weight": 1100,
           "placed_date": "2025-06-12T08:30:00Z",
@@ -241,7 +241,7 @@
         },
         "2": {
           "occupied": true,
-          "barcode": "8410337311175",
+          "barcode": "8410113556776",
           "name": "Celeste Verdejo",
           "weight": 1185,
           "placed_date": "2025-06-10T10:00:00Z",
@@ -278,7 +278,7 @@
       "positions": {
         "1": {
           "occupied": true,
-          "barcode": "8410337311182",
+          "barcode": "8414219000737",
           "name": "CUATRO RAYAS Pampano Organic Afrutado Verdejo",
           "weight": 1100,
           "placed_date": "2025-06-12T08:30:00Z",
@@ -286,7 +286,7 @@
         },
         "2": {
           "occupied": true,
-          "barcode": "8410337311199",
+          "barcode": "B08KSSB4D2",
           "name": "Se\u00f1or\u00edo de los Llanos Verdejo",
           "weight": 1100,
           "placed_date": "2025-06-12T08:30:00Z",
@@ -300,7 +300,7 @@
         },
         "5": {
           "occupied": true,
-          "barcode": "8410337311205",
+          "barcode": "8410310616907",
           "name": "Finca del Mar Verdejo",
           "weight": 1100,
           "placed_date": "2025-06-12T08:30:00Z",
@@ -346,7 +346,7 @@
         },
         "7": {
           "occupied": true,
-          "barcode": "8410337311212",
+          "barcode": "8410337311038",
           "name": "Vi\u00f1a Cumbrero Crianza",
           "weight": 1120,
           "placed_date": "2025-06-15T12:00:00Z",
@@ -354,7 +354,7 @@
         },
         "8": {
           "occupied": true,
-          "barcode": "8410337311229",
+          "barcode": "8420906059308",
           "name": "Montesierra Young Red Wine",
           "weight": 1150,
           "placed_date": "2025-06-14T15:45:00Z",
@@ -373,7 +373,7 @@
       "positions": {
         "1": {
           "occupied": true,
-          "barcode": "8410337311243",
+          "barcode": "8410261111025",
           "name": "Pata Negra Crianza",
           "weight": 1120,
           "placed_date": "2025-06-15T12:00:00Z",
@@ -387,7 +387,7 @@
         },
         "4": {
           "occupied": true,
-          "barcode": "8410337311236",
+          "barcode": "8410310606168",
           "name": "Hoya de Cadenas Cabernet Sauvignon Crianza",
           "weight": 1150,
           "placed_date": "2025-06-14T15:45:00Z",
@@ -418,7 +418,7 @@
       "positions": {
         "1": {
           "occupied": true,
-          "barcode": "8410337311274",
+          "barcode": "8410310604249",
           "name": "Finca del Mar Cabernet Sauvignon Crianza",
           "weight": 1150,
           "placed_date": "2025-06-14T15:45:00Z",
@@ -426,7 +426,7 @@
         },
         "2": {
           "occupied": true,
-          "barcode": "8410337311281",
+          "barcode": "8410415520628",
           "name": "Se\u00f1or\u00edo de los Llanos Reserva",
           "weight": 1120,
           "placed_date": "2025-06-15T12:00:00Z",
@@ -440,7 +440,7 @@
         },
         "5": {
           "occupied": true,
-          "barcode": "8410337311267",
+          "barcode": "8411528001301",
           "name": "Bodegas Aragonesas Solo Syrah Tirio",
           "weight": 1120,
           "placed_date": "2025-06-15T12:00:00Z",
@@ -448,7 +448,7 @@
         },
         "6": {
           "occupied": true,
-          "barcode": "8410337311250",
+          "barcode": "8421216194451",
           "name": "Laudum Monastrell Roble",
           "weight": 1120,
           "placed_date": "2025-06-15T12:00:00Z",

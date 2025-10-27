@@ -1,9 +1,10 @@
 import {
+  fetchSync,
+  getBottleDetails,
   handleMQTTMessage,
   searchHandler,
   updateBottleInfoModalWithPosition,
   updateSuggestionTemplate,
-  fetchSync
 } from './helpers/helpers'
 import { connectMQTT, publish, subscribe } from './mqttClient'
 import { TOPICS } from './constants/topics'
@@ -21,76 +22,33 @@ const recommendList = mealRecommendModal.querySelector('.recommend-group-list')
 const bottleInfoContainer = unloadBottleInfoModal.querySelector('.block-bottle-info')
 
 const port = 3000
-const products = Object.entries(wineCatalog.wines).map(([barcode, product]) => ({
-  ...product,
-  barcode,
-}))
 
-function getBottleDetailsFromInventory(barcode) {
-  try {
-    const inventory = fetchSync(`http://localhost:${port}/inventory`)
-    
-    if (!inventory || !inventory.drawers) {
-      console.error('[UNLOAD] Invalid inventory structure')
-      return null
-    }
-    
-    for (const [drawerId, drawer] of Object.entries(inventory.drawers)) {
-      if (!drawer.positions) continue
-      
-      for (const [position, posData] of Object.entries(drawer.positions)) {
-        if (posData && posData.occupied && posData.barcode === barcode) {
-          return {
-            drawer: drawerId,
-            position: parseInt(position),
-            weight: posData.weight || 0,
-            placed_date: posData.placed_date,
-            aging_days: posData.aging_days || 0,
-            name: posData.name,
-            ...posData
-          }
-        }
-      }
-    }
-    return null
-  } catch (error) {
-    console.error('[UNLOAD] Error fetching inventory:', error)
-    return null
-  }
-}
+const inventory = fetchSync(`http://localhost:${port}/inventory`)
+
+const barcodes = Object.values(inventory.drawers).flatMap((drawer) =>
+  Object.values(drawer.positions)
+    .filter((pos) => pos.occupied && pos.barcode)
+    .map((pos) => pos.barcode),
+)
+const barcodesSet = new Set(barcodes);
+
+const products = Object.entries(wineCatalog.wines)
+  .filter(([barcode]) => barcodesSet.has(barcode))
+  .map(([barcode, product]) => ({
+    ...product,
+    barcode,
+  }))
 
 const modalActions = {
   'unload-bottle-info-modal': (btn) => {
-    const btnText = btn.querySelector('.product-item-title')?.textContent
-    if (!btnText) {
-      console.error('[UNLOAD] No product title found')
-      return
-    }
-    
+    const inventory = fetchSync(`http://localhost:${port}/inventory`)
+    const btnText = btn.querySelector('.product-item-title').textContent
     const pickedProduct = products.find((product) => product.name === btnText)
-    if (!pickedProduct) {
-      console.error('[UNLOAD] Product not found:', btnText)
-      return
-    }
-    
-    const pickedProductPositionDetails = getBottleDetailsFromInventory(pickedProduct.barcode)
-    
-    if (!pickedProductPositionDetails) {
-      console.warn('[UNLOAD] Wine not in inventory:', pickedProduct.name)
-      alert(`${pickedProduct.name} is not currently in the fridge`)
-      return
-    }
-    
+    const pickedProductPositionDetails = getBottleDetails(pickedProduct.barcode, inventory)
     const confirmBtn = unloadBottleInfoModal.querySelector('[data-target="take-bottle-drawer-modal"]')
-    if (confirmBtn) {
-      confirmBtn.dataset.barcode = pickedProduct.barcode
-      confirmBtn.dataset.drawer = pickedProductPositionDetails.drawer
-      confirmBtn.dataset.position = pickedProductPositionDetails.position
-    }
-    
+    confirmBtn.dataset.barcode = pickedProduct.barcode
     updateBottleInfoModalWithPosition(pickedProduct, pickedProductPositionDetails, bottleInfoContainer)
   },
-  
   'unload-bottle-welcome-modal': () => {
     unloadBottleSuggestModal.classList.contains('active') && unloadBottleSuggestModal.classList.remove('active')
     mealRecommendModal.classList.contains('active') && mealRecommendModal.classList.remove('active')
@@ -100,47 +58,31 @@ const modalActions = {
   },
 
   'meal-recommend-modal': (btn) => {
-    const btnText = btn.querySelector('.suggest-item-title')?.textContent
-    if (!btnText) return
-    
+    const btnText = btn.querySelector('.suggest-item-title').textContent
     const modalTitleSelectedTextElem = mealRecommendModal.querySelector('.modal-title span')
-    const modalSubtitleSelectedTextElem = mealRecommendModal.querySelector('.modal-subtitle span')
+    const modalSubitleSelectedTextElem = mealRecommendModal.querySelector('.modal-subtitle span')
 
-    if (modalTitleSelectedTextElem) modalTitleSelectedTextElem.textContent = btnText
-    if (modalSubtitleSelectedTextElem) modalSubtitleSelectedTextElem.textContent = btnText
-    
+    modalTitleSelectedTextElem.textContent = btnText
+    modalSubitleSelectedTextElem.textContent = btnText
     const filteredProductsBySuggestion = products.filter((product) => {
-      return product.meal_type?.includes(btnText) || product.atmosphere?.includes(btnText)
+      return product.meal_type.includes(btnText) || product.atmosphere.includes(btnText)
     })
     updateSuggestionTemplate(filteredProductsBySuggestion, recommendList)
   },
-  
   'take-bottle-drawer-modal': (btn) => {
-    const barcode = btn.dataset.barcode
-    if (!barcode) {
-      console.error('[UNLOAD] No barcode found on button')
-      return
-    }
-    
-    const pickedProduct = products.find((product) => product.barcode === barcode)
-    if (!pickedProduct) {
-      console.error('[UNLOAD] Product not found for barcode:', barcode)
-      return
-    }
-    
+    const pickedProduct = products.find((product) => product.barcode === btn.dataset.barcode)
     const payload = {
-      action: 'start_unload',
-      source: 'web',
       timestamp: new Date().toISOString(),
+      source: 'web',
       data: {
+        action: 'start_unload',
         barcode: pickedProduct.barcode,
-        name: pickedProduct.name
-      }
+        name: pickedProduct.name,
+      },
     }
     const message = JSON.stringify(payload)
-    console.log('[UNLOAD] Sending command:', payload)
     publish(TOPICS.WEB_TO_RPI_COMMAND, message)
-  }
+  },
 }
 
 updateSuggestionTemplate(products, list)
@@ -154,37 +96,19 @@ document.body.addEventListener('click', (e) => {
   if (!target) return
 
   target.classList.add('active')
-  if (modalActions[targetId]) {
-    modalActions[targetId](btn)
-  }
+  modalActions[targetId]?.(btn)
 })
 
 const mqttActions = {
-  expect_removal(data) {
-    console.log('[UNLOAD] Expect removal:', data)
-    unloadBottleDrawerModal.classList.add('active')
-  },
-  
-  bottle_unloaded(data) {
-    console.log('[UNLOAD] Bottle unloaded:', data)
+  bottle_unloaded() {
     unloadBottleDrawerModal.classList.remove('active')
-    unloadBottleInfoModal.classList.remove('active')
-    if (data.success) {
-      unloadBottleSuccessModal.classList.add('active')
-    }
+    unloadBottleSuccessModal.classList.add('active')
   },
-  
-  unload_error(data) {
-    console.error('[UNLOAD] Error:', data.error)
-    alert(data.error || 'Error removing bottle')
-  }
 }
 
 connectMQTT({
   host: BROKER_URL,
   options: { clientId: 'unload-bottle-client' },
 })
-
 subscribe(TOPICS.RPI_TO_WEB_EVENT, (rawMessage) => handleMQTTMessage(rawMessage, mqttActions))
-
 searchHandler('.search-wrapper')
