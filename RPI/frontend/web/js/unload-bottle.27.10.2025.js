@@ -26,6 +26,7 @@ const products = Object.entries(wineCatalog.wines).map(([barcode, product]) => (
   barcode,
 }))
 
+// Local function to get bottle details from inventory (replaces imported getBottleDetails)
 function getBottleDetailsFromInventory(barcode) {
   try {
     const inventory = fetchSync(`http://localhost:${port}/inventory`)
@@ -35,6 +36,7 @@ function getBottleDetailsFromInventory(barcode) {
       return null
     }
     
+    // Search through all drawers for this barcode
     for (const [drawerId, drawer] of Object.entries(inventory.drawers)) {
       if (!drawer.positions) continue
       
@@ -128,6 +130,7 @@ const modalActions = {
       return
     }
     
+    // Send unload command (structure fixed - data was nested incorrectly)
     const payload = {
       action: 'start_unload',
       source: 'web',
@@ -143,8 +146,10 @@ const modalActions = {
   }
 }
 
+// Initialize suggestion list
 updateSuggestionTemplate(products, list)
 
+// Setup click handlers
 document.body.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-target]')
   if (!btn) return
@@ -159,9 +164,11 @@ document.body.addEventListener('click', (e) => {
   }
 })
 
+// MQTT action handlers
 const mqttActions = {
   expect_removal(data) {
     console.log('[UNLOAD] Expect removal:', data)
+    // Show drawer modal when position is highlighted
     unloadBottleDrawerModal.classList.add('active')
   },
   
@@ -180,11 +187,14 @@ const mqttActions = {
   }
 }
 
+// Connect MQTT
 connectMQTT({
   host: BROKER_URL,
   options: { clientId: 'unload-bottle-client' },
 })
 
+// Subscribe to events
 subscribe(TOPICS.RPI_TO_WEB_EVENT, (rawMessage) => handleMQTTMessage(rawMessage, mqttActions))
 
+// Initialize search
 searchHandler('.search-wrapper')

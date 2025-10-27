@@ -1,8 +1,8 @@
 {
   "version": "1.0",
   "name": "Lounge Fridge",
-  "last_updated": "2025-10-24T11:24:42.225978",
-  "total_bottles": 28,
+  "last_updated": "2025-10-24T13:09:49.586439",
+  "total_bottles": 29,
   "drawers": {
     "drawer_1": {
       "zone": "Lower",
@@ -162,7 +162,13 @@
           "occupied": false
         },
         "8": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8410337325035",
+          "name": "Montecillo Ros\u00e9",
+          "weight": 100,
+          "fill_percentage": 0,
+          "placed_date": "2025-10-24T13:07:46.262927",
+          "aging_days": 0
         },
         "9": {
           "occupied": false

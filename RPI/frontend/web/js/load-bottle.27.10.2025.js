@@ -40,7 +40,6 @@ const modalActions = {
   },
   'load-bottle-welcome-modal': () => {
     loadBottleInfoModal.classList.remove('active')
-    loadBottleErrorModal.classList.remove('active')
     scanCircle.classList.remove('active')
   },
 }
@@ -74,32 +73,15 @@ const mqttActions = {
       scanBottleErrorModal.classList.add('active')
     }
   },
-  
   expect_bottle() {
     scanCircle.classList.remove('active')
     loadBottleDrawerModal.classList.add('active')
   },
-  
-  // mqtt_handler 27.10.2025 sends "placement_error" for wrong position
-  placement_error(data) {
-    console.log('[LOAD] Wrong position detected:', data)
-    loadBottleDrawerModal.classList.remove('active')
-    loadBottleErrorModal.classList.add('active')
-  },
-  
   bottle_placed(data) {
-    if (data.success) {
-      loadBottleDrawerModal.classList.remove('active')
-      loadBottleErrorModal.classList.remove('active')
-      loadBottleSuccessModal.classList.add('active')
-      scannedBottle = null
-    }
-  },
-  
-  wrong_bottle_removed(data) {
-    console.log('[LOAD] Wrong bottle removed, showing drawer modal again')
-    loadBottleErrorModal.classList.remove('active')
-    loadBottleDrawerModal.classList.add('active')
+    loadBottleDrawerModal.classList.remove('active')
+    const resultModal = data.success ? loadBottleSuccessModal : loadBottleErrorModal
+    resultModal.classList.add('active')
+    scannedBottle = null
   },
 }
 

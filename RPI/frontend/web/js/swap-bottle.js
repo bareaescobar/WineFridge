@@ -1,7 +1,7 @@
 import { connectMQTT, subscribe, publish } from './mqttClient'
 import { TOPICS } from './constants/topics'
 import { BROKER_URL } from './constants/mqtt-variables'
-import { animateSwapPlaceholders, fetchSync, handleMQTTMessage, updateProductView } from './helpers/helpers'
+import { fetchSync, handleMQTTMessage, updateProductView } from './helpers/helpers'
 import wineCatalog from '../../../database/wine-catalog.json'
 
 const port = 3000
@@ -14,8 +14,7 @@ const [firstBtn, secondBtn] = bottleBtns
 const [firstText, secondText] = [firstBtn, secondBtn].map((btn) => btn.querySelector('.placeholder-text'))
 const [firstProduct, secondProduct] = [firstBtn, secondBtn].map((btn) => btn.querySelector('.product-item'))
 
-const removed = []
-const placed = []
+let bottlesRemoved = 0
 
 function resetScene() {
   swapBottlesModal.classList.remove('active')
@@ -23,75 +22,78 @@ function resetScene() {
   secondText.classList.add('active')
   firstProduct.classList.remove('active')
   secondProduct.classList.remove('active')
+  bottlesRemoved = 0
 }
 
-function handleSwapResponse(success) {
-  if (success) {
-    swapBottlesSuccessModal.classList.add('active')
-    resetScene()
-  } else {
-    swapBottlesSuccessModal.classList.remove('active')
+function startSwapMode() {
+  console.log('[SWAP] Starting swap mode')
+  bottlesRemoved = 0
+  
+  // Notify backend to start swap mode
+  const payload = {
+    action: 'start_swap',
+    source: 'web',
+    timestamp: new Date().toISOString()
   }
-  const divider = swapGroup.querySelector('.divider')
-  swapGroup.insertBefore(bottleBtns[0], divider)
-  swapGroup.insertBefore(bottleBtns[1], divider.nextSibling)
-  removed.length = 0
-  placed.length = 0
+  publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
 }
 
 const mqttActions = {
   bottle_event(data) {
     const { event, drawer, position } = data
+    console.log('[SWAP] Bottle event:', event, drawer, position)
+    
     if (event === 'removed') {
-      removed.push({ position, drawer })
+      bottlesRemoved++
+      console.log('[SWAP] Bottles removed:', bottlesRemoved)
+      
+      // Get wine info from inventory before it was removed
       const inventory = fetchSync(`http://localhost:${port}/inventory`)
-      const dr = inventory.drawers[drawer]
-      const wine = wineCatalog.wines[dr.positions[position].barcode]
-      if (removed.length === 1) updateProductView(firstProduct, firstText, wine)
-      if (removed.length === 2) updateProductView(secondProduct, secondText, wine)
-      if (removed.length > 2) removed.length = placed.length = 0
-    }
-
-    if (event === 'placed') {
-      placed.push({ position, drawer })
-      if (placed.length === 1) animateSwapPlaceholders()
-    }
-
-    if (removed.length === 2 && placed.length === 2) {
-      const removedPositions = removed.map((item) => `${item.drawer}:${item.position}`).sort()
-      const placedPositions = placed.map((item) => `${item.drawer}:${item.position}`).sort()
-      if (JSON.stringify(removedPositions) === JSON.stringify(placedPositions)) {
-        fetch(`http://localhost:${port}/swap-bottles`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from: removed[0], to: removed[1] }),
-        })
-          .then((res) => res.json())
-          .then((data) => handleSwapResponse(data.success))
-          .catch((err) => {
-            console.error('[SWAP] Error during swap:', err)
-            swapBottlesSuccessModal.classList.remove('active')
-          })
-      } else {
-        console.warn('[SWAP] Bottles not placed back into original positions — swap invalid')
+      if (inventory && inventory.drawers && inventory.drawers[drawer]) {
+        const posData = inventory.drawers[drawer].positions[position]
+        
+        if (posData && posData.barcode) {
+          const wine = wineCatalog.wines[posData.barcode]
+          if (wine) {
+            if (bottlesRemoved === 1) {
+              updateProductView(firstProduct, firstText, wine)
+            } else if (bottlesRemoved === 2) {
+              updateProductView(secondProduct, secondText, wine)
+            }
+          }
+        }
       }
     }
   },
+  
+  // mqtt_handler 27.10.2025 sends this when swap completes
+  swap_completed(data) {
+    console.log('[SWAP] Swap completed:', data)
+    if (data.success) {
+      swapBottlesSuccessModal.classList.add('active')
+      resetScene()
+    } else {
+      alert('Swap failed. Please try again.')
+      resetScene()
+    }
+  }
 }
 
-connectMQTT({ host: BROKER_URL, options: { clientId: 'swap-bottles-client' } })
+connectMQTT({ 
+  host: BROKER_URL, 
+  options: { clientId: 'swap-bottles-client' } 
+})
+
 subscribe(TOPICS.RPI_TO_WEB_EVENT, (rawMessage) => handleMQTTMessage(rawMessage, mqttActions))
-// publish(
-//   TOPICS.WEB_TO_RPI_COMMAND,
-//   JSON.stringify({ action: 'start_swap', source: 'ui', timestamp: new Date().toISOString() }),
-// )
 
 document.addEventListener('click', (event) => {
   const btn = event.target.closest('[data-target]')
   if (!btn) return
+  
   const target = btn.dataset.target
   if (target === 'swap-bottles-modal') {
     swapBottlesModal.classList.add('active')
     swapBottlesSuccessModal.classList.remove('active')
+    startSwapMode()
   }
 })
