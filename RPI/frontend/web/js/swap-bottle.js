@@ -79,17 +79,20 @@ const mqttActions = {
   }
 }
 
-connectMQTT({ 
-  host: BROKER_URL, 
-  options: { clientId: 'swap-bottles-client' } 
+connectMQTT({
+  host: BROKER_URL,
+  options: { clientId: 'swap-bottles-client' }
 })
 
 subscribe(TOPICS.RPI_TO_WEB_EVENT, (rawMessage) => handleMQTTMessage(rawMessage, mqttActions))
 
+// Start swap mode automatically when page loads
+startSwapMode()
+
 document.addEventListener('click', (event) => {
   const btn = event.target.closest('[data-target]')
   if (!btn) return
-  
+
   const target = btn.dataset.target
   if (target === 'swap-bottles-modal') {
     swapBottlesModal.classList.add('active')

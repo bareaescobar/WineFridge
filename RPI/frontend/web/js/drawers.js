@@ -63,13 +63,13 @@ function setupModalButtonsHandler() {
 
     if (btn.dataset.target === 'take-bottle-drawer-modal') {
       const payload = {
-        timestamp: new Date().toISOString(),
+        action: 'start_unload',
         source: 'web',
         data: {
-          action: 'start_unload',
           barcode: selectedBottle.barcode,
           name: selectedBottle.name,
         },
+        timestamp: new Date().toISOString()
       }
       const message = JSON.stringify(payload)
       publish(TOPICS.WEB_TO_RPI_COMMAND, message)
