@@ -742,7 +742,7 @@ zoneModalsArray.forEach((zoneModal, index) => {
   })
 })
 
-// upload image
+// unload image
 const imgInputWrappers = document.querySelectorAll('.img-file-wrapper')
 if (imgInputWrappers) {
   imgInputWrappers.forEach((inputWrapper) => {
