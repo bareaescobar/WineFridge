@@ -31,7 +31,7 @@
 // Timing
 #define HEARTBEAT_INTERVAL 60000
 #define DEBOUNCE_TIME 50
-#define WEIGHT_STABILIZE_TIME 1500  // Balanced: 1.5s for accuracy without watchdog issues
+#define WEIGHT_STABILIZE_TIME 3000  // Increased to 3s for reliable weight readings
 #define SENSOR_UPDATE_INTERVAL 15000
 #define WATCHDOG_TIMEOUT 30  // Increased from 10 to 30 seconds to accommodate weight stabilization
 
@@ -470,16 +470,31 @@ void updatePositionStateMachine(uint8_t posIndex) {
       if (millis() - pos->stateTimer > WEIGHT_STABILIZE_TIME) {
         esp_task_wdt_reset();  // Reset watchdog before heavy operations
 
-        // Read weight change from 0 baseline
-        float weightChange = readCurrentWeight();
+        // Read weight with multiple samples for accuracy
+        float weightChange = 0.0;
+        int validReadings = 0;
 
-        if (state.debugMode) {
-          Serial.printf("[DEBUG] Pos %d: Weight reading = %.1fg\n", posIndex + 1, weightChange);
+        for (int i = 0; i < 5; i++) {
+          float reading = readCurrentWeight();
+          if (reading > 0) {
+            weightChange += reading;
+            validReadings++;
+          }
+          delay(50);  // Short delay between readings
         }
+
+        if (validReadings > 0) {
+          weightChange = weightChange / validReadings;  // Average
+        }
+
+        // ALWAYS log the actual reading
+        Serial.printf("[WEIGHT] Pos %d: Raw reading = %.1fg (from %d samples)\n",
+                     posIndex + 1, weightChange, validReadings);
 
         // Switch is authority - accept bottle
         if (weightChange >= WEIGHT_THRESHOLD) {
           pos->weight = weightChange;
+          Serial.printf("[WEIGHT] ✓ Pos %d: Accepted weight %.1fg\n", posIndex + 1, weightChange);
         } else {
           // Low weight detected but switch is active - use default
           pos->weight = WEIGHT_DEFAULT_ERROR;
