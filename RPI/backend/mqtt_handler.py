@@ -1,12 +1,17 @@
 
 #!/usr/bin/env python3
 """
-WineFridge MQTT Handler - Complete Corrected Version
-Addresses all issues:
-1. Immediate wrong placement LED feedback
-2. Fixed weight percentage calculation
-3. Wine type routing to specific drawers
-4. Complete swap bottle functionality
+WineFridge MQTT Handler
+Version: 3.0.3
+Date: 28.10.2025 18:15h
+
+Handles MQTT communication between RPI, ESP32 drawers, and web interface.
+Main features:
+1. Barcode scanning and wine catalog lookup
+2. Load/Unload/Swap bottle workflows
+3. Weight-based inventory management
+4. LED control for visual feedback
+5. Real-time status monitoring
 """
 
 import json
@@ -28,9 +33,10 @@ WINE_TYPE_DRAWERS = {
 }
 
 # Weight thresholds for bottle percentage
-FULL_BOTTLE_WEIGHT = 1100  # grams (1.1kg)
-EMPTY_BOTTLE_WEIGHT = 350   # grams (empty bottle)
-MIN_BOTTLE_WEIGHT = 800     # grams (threshold for "full")
+# Bottles 900g-2000g = 100% full
+MIN_FULL_BOTTLE_WEIGHT = 900    # grams (minimum for 100% full)
+MAX_FULL_BOTTLE_WEIGHT = 2000   # grams (maximum bottle weight)
+EMPTY_BOTTLE_WEIGHT = 350       # grams (empty bottle)
 
 def find_serial_port():
     """Detectar automáticamente el puerto serie en RPI5"""
@@ -129,18 +135,25 @@ class WineFridgeController:
         return True
 
     def calculate_bottle_percentage(self, weight):
-        """Calculate bottle fill percentage based on weight"""
+        """
+        Calculate bottle fill percentage based on weight
+
+        Logic:
+        - 900g to 2000g = 100% (full bottle range)
+        - 350g to 900g = proportional (partially consumed)
+        - < 350g = 0% (empty)
+        """
         if weight < EMPTY_BOTTLE_WEIGHT:
             return 0
 
-        # If weight is above minimum threshold, consider it full
-        if weight >= MIN_BOTTLE_WEIGHT:
+        # Bottles 900g-2000g are considered 100% full
+        if weight >= MIN_FULL_BOTTLE_WEIGHT:
             return 100
 
-        # Calculate percentage between empty and full
+        # Calculate percentage between empty (350g) and full (900g)
         wine_weight = weight - EMPTY_BOTTLE_WEIGHT
-        max_wine_weight = FULL_BOTTLE_WEIGHT - EMPTY_BOTTLE_WEIGHT
-        percentage = (wine_weight / max_wine_weight) * 100
+        full_wine_weight = MIN_FULL_BOTTLE_WEIGHT - EMPTY_BOTTLE_WEIGHT
+        percentage = (wine_weight / full_wine_weight) * 100
 
         return max(0, min(100, int(percentage)))
 

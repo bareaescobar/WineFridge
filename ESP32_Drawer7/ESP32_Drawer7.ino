@@ -1,11 +1,14 @@
 /*
- * WineFridge Drawer ESP32_DRAWER - SIMPLIFIED v3.0.1
+ * WineFridge Drawer ESP32_DRAWER - SIMPLIFIED v3.0.3
  * SIMPLE WEIGHT SYSTEM: Tare after every change
- * 
+ *
  * LOGIC:
  * 1. Bottle placed → Measure weight → Save
  * 2. TARE immediately → Reset to 0
  * 3. Next bottle → Measure from 0 → No error accumulation
+ *
+ * Version: 3.0.3
+ * Date: 28.10.2025 18:15h
  */
 
 #include <WiFi.h>
@@ -20,7 +23,7 @@
 
 // ==================== CONFIGURATION ====================
 #define DRAWER_ID "drawer_7"
-#define FIRMWARE_VERSION "3.0.1"
+#define FIRMWARE_VERSION "3.0.3"
 
 // Network
 #define WIFI_SSID "MOVISTAR-WIFI6-65F8"
@@ -31,7 +34,7 @@
 // Timing
 #define HEARTBEAT_INTERVAL 60000
 #define DEBOUNCE_TIME 50
-#define WEIGHT_STABILIZE_TIME 1500  // Increased from 300ms to 2000ms for accurate readings
+#define WEIGHT_STABILIZE_TIME 3000  // Increased from 300ms to 2000ms for accurate readings
 #define SENSOR_UPDATE_INTERVAL 15000
 #define WATCHDOG_TIMEOUT 30  // Increased from 10 to 30 seconds to accommodate weight stabilization
 

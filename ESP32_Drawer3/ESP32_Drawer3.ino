@@ -1,11 +1,14 @@
 /*
- * WineFridge Drawer ESP32_DRAWER - SIMPLIFIED v3.0.1
+ * WineFridge Drawer ESP32_DRAWER - SIMPLIFIED v3.0.3
  * SIMPLE WEIGHT SYSTEM: Tare after every change
- * 
+ *
  * LOGIC:
  * 1. Bottle placed → Measure weight → Save
  * 2. TARE immediately → Reset to 0
  * 3. Next bottle → Measure from 0 → No error accumulation
+ *
+ * Version: 3.0.3
+ * Date: 28.10.2025 18:15h
  */
 
 #include <WiFi.h>
@@ -20,7 +23,7 @@
 
 // ==================== CONFIGURATION ====================
 #define DRAWER_ID "drawer_3"
-#define FIRMWARE_VERSION "3.0.1"
+#define FIRMWARE_VERSION "3.0.3"
 
 // Network
 #define WIFI_SSID "MOVISTAR-WIFI6-65F8"
@@ -470,26 +473,10 @@ void updatePositionStateMachine(uint8_t posIndex) {
       if (millis() - pos->stateTimer > WEIGHT_STABILIZE_TIME) {
         esp_task_wdt_reset();  // Reset watchdog before heavy operations
 
-        // Read weight with multiple samples for accuracy
-        float weightChange = 0.0;
-        int validReadings = 0;
+        // Read weight change from 0 baseline
+        float weightChange = readCurrentWeight();
 
-        for (int i = 0; i < 5; i++) {
-          float reading = readCurrentWeight();
-          if (reading > 0) {
-            weightChange += reading;
-            validReadings++;
-          }
-          delay(50);  // Short delay between readings
-        }
-
-        if (validReadings > 0) {
-          weightChange = weightChange / validReadings;  // Average
-        }
-
-        // ALWAYS log the actual reading
-        Serial.printf("[WEIGHT] Pos %d: Raw reading = %.1fg (from %d samples)\n",
-                     posIndex + 1, weightChange, validReadings);
+        Serial.printf("[WEIGHT] Pos %d: Raw reading = %.1fg\n", posIndex + 1, weightChange);
 
         // Switch is authority - accept bottle
         if (weightChange >= WEIGHT_THRESHOLD) {
