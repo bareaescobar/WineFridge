@@ -31,7 +31,7 @@
 // Timing
 #define HEARTBEAT_INTERVAL 60000
 #define DEBOUNCE_TIME 50
-#define WEIGHT_STABILIZE_TIME 2000  // Increased from 300ms to 2000ms for accurate readings
+#define WEIGHT_STABILIZE_TIME 1500  // Increased from 300ms to 2000ms for accurate readings
 #define SENSOR_UPDATE_INTERVAL 15000
 #define WATCHDOG_TIMEOUT 30  // Increased from 10 to 30 seconds to accommodate weight stabilization
 

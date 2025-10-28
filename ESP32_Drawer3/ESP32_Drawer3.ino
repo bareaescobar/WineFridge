@@ -31,7 +31,7 @@
 // Timing
 #define HEARTBEAT_INTERVAL 60000
 #define DEBOUNCE_TIME 50
-#define WEIGHT_STABILIZE_TIME 2000  // Increased from 300ms to 2000ms for accurate readings
+#define WEIGHT_STABILIZE_TIME 1500  // Balanced: 1.5s for accuracy without watchdog issues
 #define SENSOR_UPDATE_INTERVAL 15000
 #define WATCHDOG_TIMEOUT 30  // Increased from 10 to 30 seconds to accommodate weight stabilization
 
@@ -468,13 +468,15 @@ void updatePositionStateMachine(uint8_t posIndex) {
     
     case STATE_WEIGHING:
       if (millis() - pos->stateTimer > WEIGHT_STABILIZE_TIME) {
+        esp_task_wdt_reset();  // Reset watchdog before heavy operations
+
         // Read weight change from 0 baseline
         float weightChange = readCurrentWeight();
-        
+
         if (state.debugMode) {
           Serial.printf("[DEBUG] Pos %d: Weight reading = %.1fg\n", posIndex + 1, weightChange);
         }
-        
+
         // Switch is authority - accept bottle
         if (weightChange >= WEIGHT_THRESHOLD) {
           pos->weight = weightChange;
@@ -484,25 +486,26 @@ void updatePositionStateMachine(uint8_t posIndex) {
           Serial.printf("[WEIGHT] ⚠️  Pos %d: Low weight (%.1fg), using default %dg\n",
                        posIndex + 1, weightChange, (int)WEIGHT_DEFAULT_ERROR);
         }
-        
+
         state.individualWeights[posIndex] = pos->weight;
         pos->state = STATE_OCCUPIED;
-        
+
         setLEDAnimation(posIndex + 1, COLOR_OCCUPIED, 50, false);
-        
-        Serial.printf("[EVENT] ✓ Bottle PLACED at position %d (%.1fg)\n", 
-                     posIndex + 1, 
+
+        Serial.printf("[EVENT] ✓ Bottle PLACED at position %d (%.1fg)\n",
+                     posIndex + 1,
                      pos->weight);
-        
+
         // Send event
         queueBottleEvent(posIndex + 1, true, pos->weight);
-        
-        // CRITICAL: TARE IMMEDIATELY after measuring
-        delay(200);  // Small delay for stability
+
+        // CRITICAL: TARE IMMEDIATELY after measuring (non-blocking)
+        yield();  // Let other tasks run
         if (state.weightSensorReady && scale.is_ready()) {
           scale.tare();
           Serial.println("[WEIGHT] ✓ Tared - baseline reset to 0");
         }
+        esp_task_wdt_reset();  // Reset watchdog after operations
       }
       break;
     
@@ -530,27 +533,30 @@ void updatePositionStateMachine(uint8_t posIndex) {
         pos->stateTimer = millis();
         
         if (pos->debounceCount >= 5) {
+          esp_task_wdt_reset();  // Reset watchdog before operations
+
           float removedWeight = pos->weight;
-          
+
           pos->weight = 0.0;
           state.individualWeights[posIndex] = 0.0;
           pos->state = STATE_EMPTY;
-          
+
           setLEDAnimation(posIndex + 1, COLOR_OFF, 0, false);
-          
-          Serial.printf("[EVENT] ✓ Bottle REMOVED from position %d (was %.1fg)\n", 
-                       posIndex + 1, 
+
+          Serial.printf("[EVENT] ✓ Bottle REMOVED from position %d (was %.1fg)\n",
+                       posIndex + 1,
                        removedWeight);
-          
+
           // Send event
           queueBottleEvent(posIndex + 1, false, removedWeight);
-          
-          // CRITICAL: TARE IMMEDIATELY after removal
-          delay(200);
+
+          // CRITICAL: TARE IMMEDIATELY after removal (non-blocking)
+          yield();  // Let other tasks run
           if (state.weightSensorReady && scale.is_ready()) {
             scale.tare();
             Serial.println("[WEIGHT] ✓ Tared - baseline reset to 0");
           }
+          esp_task_wdt_reset();  // Reset watchdog after operations
         }
       }
       break;
