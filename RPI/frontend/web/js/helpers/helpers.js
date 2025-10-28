@@ -580,10 +580,34 @@ export function animateSwapPlaceholders() {
   }, 500)
 }
 
-export function calculateVolumePercent(weight, emptyWeight = 500, fullWeight = 1200) {
-  const liquidWeight = fullWeight - emptyWeight
-  const rawPercent = ((weight - emptyWeight) / liquidWeight) * 100
-  return Math.max(0, Math.min(100, Math.round(rawPercent)))
+export function calculateVolumePercent(weight) {
+  /**
+   * Calculate bottle fill percentage based on weight
+   * Matches backend logic (mqtt_handler.py v3.0.3)
+   *
+   * Logic:
+   * - 900g to 2000g = 100% (full bottle range)
+   * - 350g to 900g = proportional (partially consumed)
+   * - < 350g = 0% (empty)
+   */
+  const EMPTY_BOTTLE_WEIGHT = 350
+  const MIN_FULL_BOTTLE_WEIGHT = 900
+
+  if (weight < EMPTY_BOTTLE_WEIGHT) {
+    return 0
+  }
+
+  // Bottles 900g-2000g are considered 100% full
+  if (weight >= MIN_FULL_BOTTLE_WEIGHT) {
+    return 100
+  }
+
+  // Calculate percentage between empty (350g) and full (900g)
+  const wineWeight = weight - EMPTY_BOTTLE_WEIGHT
+  const fullWineWeight = MIN_FULL_BOTTLE_WEIGHT - EMPTY_BOTTLE_WEIGHT
+  const percentage = (wineWeight / fullWineWeight) * 100
+
+  return Math.max(0, Math.min(100, Math.round(percentage)))
 }
 
 export function capitalize(str) {
