@@ -356,24 +356,47 @@ class WineFridgeController:
     def start_bottle_unload(self, data):
         barcode = data.get('barcode')
         name = data.get('name', 'Unknown Wine')
+        preferred_drawer = data.get('drawer')  # Get drawer from UI if specified
         print(f"[UNLOAD] {name[:30]}...")
 
-        bottle_location = self.find_bottle_in_inventory(barcode)
-        if not bottle_location:
-            print(f"[ERROR] Bottle not found")
-            self.client.publish("winefridge/system/status", json.dumps({
-                "action": "unload_error",
-                "source": "mqtt_handler",
-                "data": {"error": "Bottle not found in inventory"},
-                "timestamp": datetime.now().isoformat()
-            }))
-            return
+        # If drawer specified, search in that drawer first
+        if preferred_drawer:
+            bottle_location = self.find_bottle_in_drawer(barcode, preferred_drawer)
+            if bottle_location:
+                drawer_id, position = bottle_location
+            else:
+                print(f"[ERROR] Bottle not found in specified drawer {preferred_drawer}")
+                self.client.publish("winefridge/system/status", json.dumps({
+                    "action": "unload_error",
+                    "source": "mqtt_handler",
+                    "data": {"error": f"Bottle not found in drawer {preferred_drawer}"},
+                    "timestamp": datetime.now().isoformat()
+                }))
+                return
+        else:
+            # Fallback to searching all drawers
+            bottle_location = self.find_bottle_in_inventory(barcode)
+            if not bottle_location:
+                print(f"[ERROR] Bottle not found")
+                self.client.publish("winefridge/system/status", json.dumps({
+                    "action": "unload_error",
+                    "source": "mqtt_handler",
+                    "data": {"error": "Bottle not found in inventory"},
+                    "timestamp": datetime.now().isoformat()
+                }))
+                return
+            drawer_id, position = bottle_location
 
-        drawer_id, position = bottle_location
         print(f"[UNLOAD] → {drawer_id} #{position}")
 
         if drawer_id not in FUNCTIONAL_DRAWERS:
             print(f"[ERROR] {drawer_id} has no sensors")
+            self.client.publish("winefridge/system/status", json.dumps({
+                "action": "unload_error",
+                "source": "mqtt_handler",
+                "data": {"error": f"Drawer {drawer_id} has no weight sensors"},
+                "timestamp": datetime.now().isoformat()
+            }))
             return
 
         op_id = f"unload_{int(time.time())}"
@@ -444,6 +467,14 @@ class WineFridgeController:
     def find_bottle_in_inventory(self, barcode):
         for drawer_id, drawer_data in self.inventory.get("drawers", {}).items():
             for position, pos_data in drawer_data.get("positions", {}).items():
+                if pos_data.get("occupied") and pos_data.get("barcode") == barcode:
+                    return drawer_id, int(position)
+        return None
+
+    def find_bottle_in_drawer(self, barcode, drawer_id):
+        """Find a bottle by barcode in a specific drawer"""
+        if drawer_id in self.inventory.get("drawers", {}):
+            for position, pos_data in self.inventory["drawers"][drawer_id].get("positions", {}).items():
                 if pos_data.get("occupied") and pos_data.get("barcode") == barcode:
                     return drawer_id, int(position)
         return None
@@ -522,10 +553,13 @@ class WineFridgeController:
                     if expected['target_drawer'] == drawer_id and expected['target_position'] == position:
                         print(f"[SWAP] Bottle placed correctly in swapped position")
 
-                        # Update inventory with swapped bottle
+                        # Update inventory with swapped bottle - preserve original weight
                         bottle_info = expected['bottle']
+                        original_weight = bottle_info.get('weight', weight)  # Use stored weight
+                        fill_percentage = self.calculate_bottle_percentage(original_weight)
+
                         self.update_inventory(drawer_id, position, bottle_info['barcode'],
-                                             bottle_info['name'], weight)
+                                             bottle_info['name'], original_weight, fill_percentage)
 
                         # Remove from pending placements
                         self.swap_operations['bottles_to_place'].pop(i)

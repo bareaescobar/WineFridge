@@ -33,7 +33,12 @@ const { mode, zone, positions } = inventory.drawers[drawerId]
 function updateActiveWineInfo() {
   const activeBottle = document.querySelector('.drawer-bottles .bottle.selected')
   const activeBarcode = activeBottle?.dataset.barcode
-  selectedBottle = { ...wineCatalog.wines[activeBarcode], barcode: activeBarcode }
+  // Store both barcode and drawer info in selectedBottle
+  selectedBottle = {
+    ...wineCatalog.wines[activeBarcode],
+    barcode: activeBarcode,
+    drawer: drawerId  // Add drawer ID from the page context
+  }
   const buttons = wineInfoElem.querySelector('.bottle-btns')
 
   wineInfoElem.innerHTML = ''
@@ -68,6 +73,7 @@ function setupModalButtonsHandler() {
         data: {
           barcode: selectedBottle.barcode,
           name: selectedBottle.name,
+          drawer: selectedBottle.drawer  // Include drawer ID to unload from correct drawer
         },
         timestamp: new Date().toISOString()
       }
