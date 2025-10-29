@@ -8,6 +8,9 @@ const port = 3000
 
 const swapBottlesModal = document.getElementById('swap-bottles-modal')
 const swapBottlesSuccessModal = document.getElementById('swap-bottles-success-modal')
+const swapErrorModal = document.getElementById('swap-error-modal')
+const swapErrorTitle = swapErrorModal?.querySelector('#swap-error-title')
+const swapErrorSubtitle = swapErrorModal?.querySelector('#swap-error-subtitle')
 const swapGroup = document.querySelector('.swap-group')
 const bottleBtns = swapGroup.querySelectorAll('.bottle-placeholder')
 const [firstBtn, secondBtn] = bottleBtns
@@ -82,12 +85,21 @@ const mqttActions = {
   swap_error(data) {
     console.log('[SWAP] Error detected:', data)
 
-    if (data.error === 'wrong_swap_position') {
+    if (data.error === 'wrong_swap_position' && swapErrorModal) {
       const expectedPos = data.expected_positions ? data.expected_positions.join(' or ') : 'correct position'
-      // Show simple alert (can be replaced with a nice modal later)
-      alert(`⚠️ Wrong Position!\n\nYou placed bottle at position ${data.wrong_position}\nPlease place at position ${expectedPos}\n\nLEDs show: RED = wrong, GREEN = correct`)
+
+      // Update modal text with specific positions
+      if (swapErrorTitle) {
+        swapErrorTitle.innerHTML = `Wrong Position<br/>During Swap`
+      }
+      if (swapErrorSubtitle) {
+        swapErrorSubtitle.innerHTML = `You placed bottle at position <strong>${data.wrong_position}</strong>.<br/>Please place at position <strong>${expectedPos}</strong> instead.<br/><br/>LEDs show: <span style="color: red">RED = wrong</span>, <span style="color: green">GREEN = correct</span>`
+      }
+
+      // Show error modal
+      swapErrorModal.classList.add('active')
     } else {
-      // Generic error
+      // Fallback to alert for other errors
       alert(`⚠️ Swap Error\n\n${data.error || 'Unknown error'}`)
     }
   }

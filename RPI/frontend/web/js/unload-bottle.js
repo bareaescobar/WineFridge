@@ -17,6 +17,9 @@ const unloadBottleInfoModal = document.getElementById('unload-bottle-info-modal'
 const unloadBottleDrawerModal = document.getElementById('take-bottle-drawer-modal')
 const mealRecommendModal = document.getElementById('meal-recommend-modal')
 const unloadBottleSuccessModal = document.getElementById('take-bottle-success-modal')
+const unloadErrorModal = document.getElementById('unload-error-modal')
+const unloadErrorTitle = unloadErrorModal?.querySelector('#unload-error-title')
+const unloadErrorSubtitle = unloadErrorModal?.querySelector('#unload-error-subtitle')
 const list = unloadBottleManuallyModal.querySelector('.products-list')
 const recommendList = mealRecommendModal.querySelector('.recommend-group-list')
 const bottleInfoContainer = unloadBottleInfoModal.querySelector('.block-bottle-info')
@@ -110,11 +113,20 @@ const mqttActions = {
   unload_error(data) {
     console.log('[UNLOAD] Error detected:', data)
 
-    if (data.error === 'wrong_bottle_removed') {
-      // Show simple alert (can be replaced with a nice modal later)
-      alert(`⚠️ Wrong Bottle!\n\nYou removed bottle from position ${data.wrong_position}\nPlease remove from position ${data.correct_position}\n\nLEDs show: RED = wrong, GREEN = correct`)
+    if (data.error === 'wrong_bottle_removed' && unloadErrorModal) {
+      // Update modal text with specific positions
+      if (unloadErrorTitle) {
+        unloadErrorTitle.innerHTML = `Wrong Bottle<br/>Removed`
+      }
+      if (unloadErrorSubtitle) {
+        unloadErrorSubtitle.innerHTML = `You removed position <strong>${data.wrong_position}</strong>.<br/>Please remove position <strong>${data.correct_position}</strong> instead.<br/><br/>LEDs show: <span style="color: red">RED = wrong</span>, <span style="color: green">GREEN = correct</span>`
+      }
+
+      // Hide drawer modal and show error modal
+      unloadBottleDrawerModal.classList.remove('active')
+      unloadErrorModal.classList.add('active')
     } else {
-      // Generic error
+      // Fallback to alert for other errors
       alert(`⚠️ Unload Error\n\n${data.error || 'Unknown error'}`)
     }
   },
