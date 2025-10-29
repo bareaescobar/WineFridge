@@ -33,7 +33,12 @@ const { mode, zone, positions } = inventory.drawers[drawerId]
 function updateActiveWineInfo() {
   const activeBottle = document.querySelector('.drawer-bottles .bottle.selected')
   const activeBarcode = activeBottle?.dataset.barcode
-  selectedBottle = { ...wineCatalog.wines[activeBarcode], barcode: activeBarcode }
+  // Store both barcode and drawer info in selectedBottle
+  selectedBottle = {
+    ...wineCatalog.wines[activeBarcode],
+    barcode: activeBarcode,
+    drawer: drawerId  // Add drawer ID from the page context
+  }
   const buttons = wineInfoElem.querySelector('.bottle-btns')
 
   wineInfoElem.innerHTML = ''
@@ -63,13 +68,14 @@ function setupModalButtonsHandler() {
 
     if (btn.dataset.target === 'take-bottle-drawer-modal') {
       const payload = {
-        timestamp: new Date().toISOString(),
+        action: 'start_unload',
         source: 'web',
         data: {
-          action: 'start_unload',
           barcode: selectedBottle.barcode,
           name: selectedBottle.name,
+          drawer: selectedBottle.drawer  // Include drawer ID to unload from correct drawer
         },
+        timestamp: new Date().toISOString()
       }
       const message = JSON.stringify(payload)
       publish(TOPICS.WEB_TO_RPI_COMMAND, message)

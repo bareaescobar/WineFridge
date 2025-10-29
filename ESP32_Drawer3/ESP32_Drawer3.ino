@@ -1,11 +1,14 @@
 /*
- * WineFridge Drawer ESP32_DRAWER - SIMPLIFIED v3.0.1
+ * WineFridge Drawer ESP32_DRAWER - SIMPLIFIED v3.0.3
  * SIMPLE WEIGHT SYSTEM: Tare after every change
- * 
+ *
  * LOGIC:
  * 1. Bottle placed → Measure weight → Save
  * 2. TARE immediately → Reset to 0
  * 3. Next bottle → Measure from 0 → No error accumulation
+ *
+ * Version: 3.0.3
+ * Date: 28.10.2025 18:15h
  */
 
 #include <WiFi.h>
@@ -20,7 +23,7 @@
 
 // ==================== CONFIGURATION ====================
 #define DRAWER_ID "drawer_3"
-#define FIRMWARE_VERSION "3.0.1"
+#define FIRMWARE_VERSION "3.0.3"
 
 // Network
 #define WIFI_SSID "MOVISTAR-WIFI6-65F8"
@@ -31,9 +34,9 @@
 // Timing
 #define HEARTBEAT_INTERVAL 60000
 #define DEBOUNCE_TIME 50
-#define WEIGHT_STABILIZE_TIME 300
+#define WEIGHT_STABILIZE_TIME 3000  // Increased to 3s for reliable weight readings
 #define SENSOR_UPDATE_INTERVAL 15000
-#define WATCHDOG_TIMEOUT 10
+#define WATCHDOG_TIMEOUT 30  // Increased from 10 to 30 seconds to accommodate weight stabilization
 
 // Hardware
 const uint8_t SWITCH_PINS[9] = {5, 32, 26, 14, 4, 23, 33, 27, 12};
@@ -468,41 +471,43 @@ void updatePositionStateMachine(uint8_t posIndex) {
     
     case STATE_WEIGHING:
       if (millis() - pos->stateTimer > WEIGHT_STABILIZE_TIME) {
+        esp_task_wdt_reset();  // Reset watchdog before heavy operations
+
         // Read weight change from 0 baseline
         float weightChange = readCurrentWeight();
-        
-        if (state.debugMode) {
-          Serial.printf("[DEBUG] Pos %d: Weight reading = %.1fg\n", posIndex + 1, weightChange);
-        }
-        
+
+        Serial.printf("[WEIGHT] Pos %d: Raw reading = %.1fg\n", posIndex + 1, weightChange);
+
         // Switch is authority - accept bottle
         if (weightChange >= WEIGHT_THRESHOLD) {
           pos->weight = weightChange;
+          Serial.printf("[WEIGHT] ✓ Pos %d: Accepted weight %.1fg\n", posIndex + 1, weightChange);
         } else {
           // Low weight detected but switch is active - use default
           pos->weight = WEIGHT_DEFAULT_ERROR;
           Serial.printf("[WEIGHT] ⚠️  Pos %d: Low weight (%.1fg), using default %dg\n",
                        posIndex + 1, weightChange, (int)WEIGHT_DEFAULT_ERROR);
         }
-        
+
         state.individualWeights[posIndex] = pos->weight;
         pos->state = STATE_OCCUPIED;
-        
+
         setLEDAnimation(posIndex + 1, COLOR_OCCUPIED, 50, false);
-        
-        Serial.printf("[EVENT] ✓ Bottle PLACED at position %d (%.1fg)\n", 
-                     posIndex + 1, 
+
+        Serial.printf("[EVENT] ✓ Bottle PLACED at position %d (%.1fg)\n",
+                     posIndex + 1,
                      pos->weight);
-        
+
         // Send event
         queueBottleEvent(posIndex + 1, true, pos->weight);
-        
-        // CRITICAL: TARE IMMEDIATELY after measuring
-        delay(200);  // Small delay for stability
+
+        // CRITICAL: TARE IMMEDIATELY after measuring (non-blocking)
+        yield();  // Let other tasks run
         if (state.weightSensorReady && scale.is_ready()) {
           scale.tare();
           Serial.println("[WEIGHT] ✓ Tared - baseline reset to 0");
         }
+        esp_task_wdt_reset();  // Reset watchdog after operations
       }
       break;
     
@@ -530,27 +535,30 @@ void updatePositionStateMachine(uint8_t posIndex) {
         pos->stateTimer = millis();
         
         if (pos->debounceCount >= 5) {
+          esp_task_wdt_reset();  // Reset watchdog before operations
+
           float removedWeight = pos->weight;
-          
+
           pos->weight = 0.0;
           state.individualWeights[posIndex] = 0.0;
           pos->state = STATE_EMPTY;
-          
+
           setLEDAnimation(posIndex + 1, COLOR_OFF, 0, false);
-          
-          Serial.printf("[EVENT] ✓ Bottle REMOVED from position %d (was %.1fg)\n", 
-                       posIndex + 1, 
+
+          Serial.printf("[EVENT] ✓ Bottle REMOVED from position %d (was %.1fg)\n",
+                       posIndex + 1,
                        removedWeight);
-          
+
           // Send event
           queueBottleEvent(posIndex + 1, false, removedWeight);
-          
-          // CRITICAL: TARE IMMEDIATELY after removal
-          delay(200);
+
+          // CRITICAL: TARE IMMEDIATELY after removal (non-blocking)
+          yield();  // Let other tasks run
           if (state.weightSensorReady && scale.is_ready()) {
             scale.tare();
             Serial.println("[WEIGHT] ✓ Tared - baseline reset to 0");
           }
+          esp_task_wdt_reset();  // Reset watchdog after operations
         }
       }
       break;
