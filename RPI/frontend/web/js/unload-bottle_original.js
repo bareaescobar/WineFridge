@@ -1,4 +1,5 @@
 import {
+  fetchSync,
   getBottleDetails,
   handleMQTTMessage,
   searchHandler,
@@ -20,16 +21,30 @@ const list = unloadBottleManuallyModal.querySelector('.products-list')
 const recommendList = mealRecommendModal.querySelector('.recommend-group-list')
 const bottleInfoContainer = unloadBottleInfoModal.querySelector('.block-bottle-info')
 
-const products = Object.entries(wineCatalog.wines).map(([barcode, product]) => ({
-  ...product,
-  barcode,
-}))
+const port = 3000
+
+const inventory = fetchSync(`http://localhost:${port}/inventory`)
+
+const barcodes = Object.values(inventory.drawers).flatMap((drawer) =>
+  Object.values(drawer.positions)
+    .filter((pos) => pos.occupied && pos.barcode)
+    .map((pos) => pos.barcode),
+)
+const barcodesSet = new Set(barcodes);
+
+const products = Object.entries(wineCatalog.wines)
+  .filter(([barcode]) => barcodesSet.has(barcode))
+  .map(([barcode, product]) => ({
+    ...product,
+    barcode,
+  }))
 
 const modalActions = {
   'unload-bottle-info-modal': (btn) => {
+    const inventory = fetchSync(`http://localhost:${port}/inventory`)
     const btnText = btn.querySelector('.product-item-title').textContent
     const pickedProduct = products.find((product) => product.name === btnText)
-    const pickedProductPositionDetails = getBottleDetails(pickedProduct.barcode)
+    const pickedProductPositionDetails = getBottleDetails(pickedProduct.barcode, inventory)
     const confirmBtn = unloadBottleInfoModal.querySelector('[data-target="take-bottle-drawer-modal"]')
     confirmBtn.dataset.barcode = pickedProduct.barcode
     updateBottleInfoModalWithPosition(pickedProduct, pickedProductPositionDetails, bottleInfoContainer)

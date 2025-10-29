@@ -76,20 +76,6 @@ const mqttActions = {
       alert('Swap failed. Please try again.')
       resetScene()
     }
-  },
-
-  // Handle wrong position error during swap
-  swap_error(data) {
-    console.log('[SWAP] Error detected:', data)
-
-    if (data.error === 'wrong_swap_position') {
-      const expectedPos = data.expected_positions ? data.expected_positions.join(' or ') : 'correct position'
-      // Show simple alert (can be replaced with a nice modal later)
-      alert(`⚠️ Wrong Position!\n\nYou placed bottle at position ${data.wrong_position}\nPlease place at position ${expectedPos}\n\nLEDs show: RED = wrong, GREEN = correct`)
-    } else {
-      // Generic error
-      alert(`⚠️ Swap Error\n\n${data.error || 'Unknown error'}`)
-    }
   }
 }
 

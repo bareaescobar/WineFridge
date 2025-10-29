@@ -72,10 +72,10 @@ const modalActions = {
   'take-bottle-drawer-modal': (btn) => {
     const pickedProduct = products.find((product) => product.barcode === btn.dataset.barcode)
     const payload = {
-      timestamp: new Date().toISOString(),
+      action: 'start_unload',
       source: 'web',
+      timestamp: new Date().toISOString(),
       data: {
-        action: 'start_unload',
         barcode: pickedProduct.barcode,
         name: pickedProduct.name,
       },
@@ -100,9 +100,23 @@ document.body.addEventListener('click', (e) => {
 })
 
 const mqttActions = {
-  bottle_unloaded() {
+  bottle_unloaded(data) {
+    console.log('[UNLOAD] Bottle unloaded successfully:', data)
     unloadBottleDrawerModal.classList.remove('active')
     unloadBottleSuccessModal.classList.add('active')
+  },
+
+  // Handle wrong position error during unload
+  unload_error(data) {
+    console.log('[UNLOAD] Error detected:', data)
+
+    if (data.error === 'wrong_bottle_removed') {
+      // Show simple alert (can be replaced with a nice modal later)
+      alert(`⚠️ Wrong Bottle!\n\nYou removed bottle from position ${data.wrong_position}\nPlease remove from position ${data.correct_position}\n\nLEDs show: RED = wrong, GREEN = correct`)
+    } else {
+      // Generic error
+      alert(`⚠️ Unload Error\n\n${data.error || 'Unknown error'}`)
+    }
   },
 }
 
