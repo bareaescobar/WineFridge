@@ -1,0 +1,20 @@
+Steps to configure new SD Winefridge system
+
+1 - With RPI OS installer, install RPI OS with WIFI credentials and ssh activated in the SD
+
+2 - Insert SD in RPI and power on
+
+3 - In local cmd: 
+	ssh plasticlab@192.168.1.84 (Plasticlab's wifi, in different networks the IP could be different, you can check the IP in Wifi settings using the touch panel
+
+    	ssh-keygen -R 192.168.1.84 (if credentials error)
+
+4 - launch command: git clone bareaescobar/winefridge
+
+5 - Once repo cloned next commands:
+	cd winefridge
+	chmod +x setup_pi.sh
+    	sudo ./setup_pi.sh
+
+6 - to configure rpi-connect:  
+	rpi-connect signin (and copy url in local web browser)
