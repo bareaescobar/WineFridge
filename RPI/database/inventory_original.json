@@ -19,10 +19,20 @@
           "aging_days": 1
         },
         "2": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8436532094941",
+          "name": "Granza Organic Ros\u00e9 Wine",
+          "weight": 1170,
+          "placed_date": "2025-06-11T18:20:00Z",
+          "aging_days": 6
         },
         "3": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8414825339511",
+          "name": "Alma Atl\u00e1ntica Ros\u00e9",
+          "weight": 1170,
+          "placed_date": "2025-06-11T18:20:00Z",
+          "aging_days": 6
         },
         "4": {
           "occupied": true,
@@ -64,7 +74,12 @@
           "aging_days": 1
         },
         "2": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8410337325035",
+          "name": "Montecillo Ros\u00e9",
+          "weight": 1170,
+          "placed_date": "2025-06-11T18:20:00Z",
+          "aging_days": 6
         },
         "3": {
           "occupied": false
@@ -96,28 +111,64 @@
       "mode": "rose",
       "positions": {
         "1": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8420342072022",
+          "name": "Protos Clarete Ros\u00e9 Wine",
+          "weight": 1050,
+          "placed_date": "2025-06-16T09:00:00Z",
+          "aging_days": 1
         },
         "2": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8410113009005",
+          "name": "Torres Vi\u00f1a Esmeralda Ros\u00e9",
+          "weight": 1170,
+          "placed_date": "2025-06-11T18:20:00Z",
+          "aging_days": 6
         },
         "3": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8410337311038",
+          "name": "Vi\u00f1a Cumbrero Crianza",
+          "weight": 100,
+          "placed_date": "2025-10-23T17:05:14.696404",
+          "aging_days": 0
         },
         "4": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8414219001109",
+          "name": "Veliterra Rueda Verdejo",
+          "weight": 100,
+          "placed_date": "2025-10-24T11:21:03.089272",
+          "aging_days": 0
         },
         "5": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "B08KSSB4D2",
+          "name": "Se\u00f1or\u00edo de los Llanos Verdejo",
+          "weight": 2635.9,
+          "placed_date": "2025-10-24T11:21:58.510796",
+          "aging_days": 0
         },
         "6": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8411528001301",
+          "name": "Bodegas Aragonesas Solo Syrah Tirio",
+          "weight": 281.1,
+          "placed_date": "2025-10-24T11:23:13.988049",
+          "aging_days": 0
         },
         "7": {
           "occupied": false
         },
         "8": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8410337325035",
+          "name": "Montecillo Ros\u00e9",
+          "weight": 100,
+          "fill_percentage": 0,
+          "placed_date": "2025-10-24T13:07:46.262927",
+          "aging_days": 0
         },
         "9": {
           "occupied": false

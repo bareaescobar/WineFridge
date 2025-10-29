@@ -96,7 +96,12 @@
       "mode": "rose",
       "positions": {
         "1": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8420342072022",
+          "name": "Protos Clarete Ros\u00e9 Wine",
+          "weight": 1050,
+          "placed_date": "2025-06-16T09:00:00Z",
+          "aging_days": 1
         },
         "2": {
           "occupied": false
