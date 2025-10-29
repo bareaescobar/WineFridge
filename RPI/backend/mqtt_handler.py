@@ -423,6 +423,7 @@ class WineFridgeController:
             'name': name,
             'drawer': drawer_id,
             'position': position,
+            'expected_position': position,  # Track expected position for wrong placement detection
             'timestamp': time.time()
         }
 
@@ -483,10 +484,16 @@ class WineFridgeController:
         }
 
     def find_bottle_in_inventory(self, barcode):
-        for drawer_id, drawer_data in self.inventory.get("drawers", {}).items():
-            for position, pos_data in drawer_data.get("positions", {}).items():
-                if pos_data.get("occupied") and pos_data.get("barcode") == barcode:
-                    return drawer_id, int(position)
+        """Find bottle in inventory, prioritizing functional drawers"""
+        # First search in functional drawers only (3, 5, 7)
+        for drawer_id in FUNCTIONAL_DRAWERS:
+            if drawer_id in self.inventory.get("drawers", {}):
+                drawer_data = self.inventory["drawers"][drawer_id]
+                for position, pos_data in drawer_data.get("positions", {}).items():
+                    if pos_data.get("occupied") and pos_data.get("barcode") == barcode:
+                        return drawer_id, int(position)
+
+        # If not found in functional drawers, return None (don't search in non-functional drawers)
         return None
 
     def find_bottle_in_drawer(self, barcode, drawer_id):
@@ -592,8 +599,10 @@ class WineFridgeController:
             # Check if placement matches expected swap
             if len(self.swap_operations['bottles_to_place']) > 0:
                 # Check if this placement matches any expected position
+                match_found = False
                 for i, expected in enumerate(self.swap_operations['bottles_to_place']):
                     if expected['target_drawer'] == drawer_id and expected['target_position'] == position:
+                        match_found = True
                         print(f"[SWAP] Bottle placed correctly in swapped position")
 
                         # BLUE blinking during weighing
@@ -680,6 +689,43 @@ class WineFridgeController:
                             }
                         break
 
+                # Wrong position during swap
+                if not match_found:
+                    print(f"[SWAP ERROR] Wrong placement at {drawer_id} #{position}")
+
+                    # Build LED positions: RED on wrong, GREEN/YELLOW on expected
+                    led_positions = [{"position": position, "color": "#FF0000", "brightness": 100}]
+
+                    # Add expected positions (GREEN for current targets)
+                    for expected in self.swap_operations['bottles_to_place']:
+                        if expected['target_drawer'] == drawer_id:
+                            led_positions.append({
+                                "position": expected['target_position'],
+                                "color": "#00FF00",
+                                "brightness": 100
+                            })
+
+                    self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                        "action": "set_leds",
+                        "source": "mqtt_handler",
+                        "data": {"positions": led_positions},
+                        "timestamp": datetime.now().isoformat()
+                    }))
+
+                    # Notify UI of wrong placement
+                    expected_positions = [e['target_position'] for e in self.swap_operations['bottles_to_place'] if e['target_drawer'] == drawer_id]
+                    self.client.publish("winefridge/system/status", json.dumps({
+                        "action": "swap_error",
+                        "source": "mqtt_handler",
+                        "data": {
+                            "error": "wrong_swap_position",
+                            "drawer": drawer_id,
+                            "wrong_position": position,
+                            "expected_positions": expected_positions
+                        },
+                        "timestamp": datetime.now().isoformat()
+                    }))
+
     def handle_bottle_placed(self, drawer_id, position, weight):
         """Handle normal bottle placement (non-swap)"""
 
@@ -689,7 +735,7 @@ class WineFridgeController:
         # Find matching pending operation
         found_op = None
         for op_id, op in list(self.pending_operations.items()):
-            if op['drawer'] == drawer_id:
+            if op['drawer'] == drawer_id and op['type'] == 'load':
                 # Check if placed in correct position
                 if op['expected_position'] == position:
                     found_op = (op_id, op, True)  # Correct placement
@@ -705,6 +751,42 @@ class WineFridgeController:
         if not correct_placement:
             # Wrong position - immediate feedback
             print(f"[ERROR] Wrong placement! Expected #{op['expected_position']}, got #{position}")
+
+            # Track error count
+            if 'error_count' not in op:
+                op['error_count'] = 0
+            op['error_count'] += 1
+
+            # After 2 errors, mark position with white LED and cancel operation
+            if op['error_count'] >= 2:
+                print(f"[ERROR] Too many wrong placements ({op['error_count']}), cancelling operation")
+
+                # White LED on last wrong position to indicate system gave up
+                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                    "action": "set_leds",
+                    "source": "mqtt_handler",
+                    "data": {"positions": [{"position": position, "color": "#FFFFFF", "brightness": 100}]},
+                    "timestamp": datetime.now().isoformat()
+                }))
+
+                # Notify UI of too many errors
+                self.client.publish("winefridge/system/status", json.dumps({
+                    "action": "placement_error",
+                    "source": "mqtt_handler",
+                    "data": {
+                        "error": "too_many_errors",
+                        "drawer": drawer_id,
+                        "wrong_position": position,
+                        "correct_position": op['expected_position'],
+                        "wine_name": op['name'],
+                        "close_screen": True
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }))
+
+                # Cancel operation
+                del self.pending_operations[op_id]
+                return
 
             # Red LED on wrong position
             self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
@@ -723,7 +805,8 @@ class WineFridgeController:
                     "drawer": drawer_id,
                     "wrong_position": position,
                     "correct_position": op['expected_position'],
-                    "wine_name": op['name']
+                    "wine_name": op['name'],
+                    "error_count": op['error_count']
                 },
                 "timestamp": datetime.now().isoformat()
             }))
@@ -768,12 +851,12 @@ class WineFridgeController:
             del self.pending_operations[op_id]
 
     def handle_bottle_removed(self, drawer_id, position):
-        """Handle bottle removal"""
+        """Handle bottle removal with wrong position detection"""
 
-        # Check if this is part of wrong placement recovery
+        # Check if this is part of wrong placement recovery (LOAD operation)
         wrong_placement_op = None
         for op_id, op in list(self.pending_operations.items()):
-            if op.get('wrong_position') == position and op['drawer'] == drawer_id:
+            if op.get('wrong_position') == position and op['drawer'] == drawer_id and op['type'] == 'load':
                 wrong_placement_op = (op_id, op)
                 break
 
@@ -814,17 +897,57 @@ class WineFridgeController:
 
             return
 
-        # Normal unload operation
+        # Check for UNLOAD operations
         found_op = None
         for op_id, op in list(self.pending_operations.items()):
-            if op['drawer'] == drawer_id and op['position'] == position and op['type'] == 'unload':
-                found_op = (op_id, op)
+            if op['drawer'] == drawer_id and op['type'] == 'unload':
+                # Check if removed from correct position
+                if op['expected_position'] == position:
+                    found_op = (op_id, op, True)  # Correct removal
+                else:
+                    found_op = (op_id, op, False)  # Wrong removal
                 break
 
         if not found_op:
             return  # Manual removal
 
-        op_id, op = found_op
+        op_id, op, correct_removal = found_op
+
+        if not correct_removal:
+            # Wrong position removed during unload
+            print(f"[ERROR] Wrong bottle removed! Expected #{op['expected_position']}, got #{position}")
+
+            # Red LED on wrong position
+            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                "action": "set_leds",
+                "source": "mqtt_handler",
+                "data": {"positions": [
+                    {"position": position, "color": "#FF0000", "brightness": 100},
+                    {"position": op['expected_position'], "color": "#00FF00", "brightness": 100}
+                ]},
+                "timestamp": datetime.now().isoformat()
+            }))
+
+            # Notify UI about wrong removal
+            self.client.publish("winefridge/system/status", json.dumps({
+                "action": "unload_error",
+                "source": "mqtt_handler",
+                "data": {
+                    "error": "wrong_bottle_removed",
+                    "drawer": drawer_id,
+                    "wrong_position": position,
+                    "correct_position": op['expected_position'],
+                    "wine_name": op['name']
+                },
+                "timestamp": datetime.now().isoformat()
+            }))
+
+            # Mark wrong position for tracking
+            op['wrong_removal_position'] = position
+
+            return
+
+        # Correct removal
         print(f"[REMOVED] ✓ {drawer_id} #{position}")
 
         self.clear_inventory_position(drawer_id, position)
