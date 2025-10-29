@@ -26,7 +26,8 @@ module.exports = {
       interpreter: 'none',
       env: {
         XDG_SESSION_TYPE: 'wayland',
-        XDG_CURRENT_DESKTOP: 'LXDE'
+        XDG_CURRENT_DESKTOP: 'labwc', //'LXDE'
+	XDG_RUNTIME_DIR: '/run/user/1000'
       }
     }
   ]

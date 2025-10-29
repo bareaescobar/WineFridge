@@ -92,8 +92,8 @@ sudo -u $TARGET_USER bash -c "cd '$SCRIPT_DIR/RPI/frontend' && npm install && np
 
 # 13. Iniciar el Backend con PM2
 echo "--- 10. Iniciando el Backend con PM2 ---"
-# Es crucial ejecutar esto como el usuario, no como root
-sudo -u $TARGET_USER bash -c "cd '$SCRIPT_DIR/RPI/backend' && pm2 start pm2.config.js"
+# [CORRECCIÓN] Cambiado 'RPI/backend' a 'RPI'
+sudo -u $TARGET_USER bash -c "cd '$SCRIPT_DIR/RPI' && pm2 start pm2.config.js"
 
 # 14. Guardar la lista de procesos de PM2
 echo "--- 11. Guardando la lista de procesos PM2 ---"
