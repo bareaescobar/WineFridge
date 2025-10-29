@@ -33,10 +33,11 @@ WINE_TYPE_DRAWERS = {
 }
 
 # Weight thresholds for bottle percentage
-# Bottles 900g-2000g = 100% full
-MIN_FULL_BOTTLE_WEIGHT = 900    # grams (minimum for 100% full)
+# Adjusted for prototype usage - more permissive thresholds
+# Since 99% of bottles will be 100% full, use lower threshold to account for sensor variations
+MIN_FULL_BOTTLE_WEIGHT = 700    # grams (minimum for 100% full) - lowered from 900g for sensor tolerance
 MAX_FULL_BOTTLE_WEIGHT = 2000   # grams (maximum bottle weight)
-EMPTY_BOTTLE_WEIGHT = 350       # grams (empty bottle)
+EMPTY_BOTTLE_WEIGHT = 300       # grams (empty bottle) - lowered from 350g for sensor tolerance
 
 def find_serial_port():
     """Detectar automáticamente el puerto serie en RPI5"""
@@ -138,19 +139,22 @@ class WineFridgeController:
         """
         Calculate bottle fill percentage based on weight
 
+        Optimized for prototype where 99% of bottles are 100% full.
+        Uses more permissive thresholds to account for sensor variations.
+
         Logic:
-        - 900g to 2000g = 100% (full bottle range)
-        - 350g to 900g = proportional (partially consumed)
-        - < 350g = 0% (empty)
+        - >= 700g = 100% (full bottle) - permissive threshold for sensor tolerance
+        - 300g to 700g = proportional (partially consumed)
+        - < 300g = 0% (empty)
         """
         if weight < EMPTY_BOTTLE_WEIGHT:
             return 0
 
-        # Bottles 900g-2000g are considered 100% full
+        # Bottles >= 700g are considered 100% full (more permissive for sensor variations)
         if weight >= MIN_FULL_BOTTLE_WEIGHT:
             return 100
 
-        # Calculate percentage between empty (350g) and full (900g)
+        # Calculate percentage between empty (300g) and full (700g)
         wine_weight = weight - EMPTY_BOTTLE_WEIGHT
         full_wine_weight = MIN_FULL_BOTTLE_WEIGHT - EMPTY_BOTTLE_WEIGHT
         percentage = (wine_weight / full_wine_weight) * 100
@@ -342,11 +346,11 @@ class WineFridgeController:
             'timestamp': time.time()
         }
 
-        # LED + expect commands
+        # LED + expect commands (GREEN = action expected - place bottle here)
         self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
             "action": "set_leds",
             "source": "mqtt_handler",
-            "data": {"positions": [{"position": position, "color": "#0000FF", "brightness": 100}]},
+            "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100}]},
             "timestamp": datetime.now().isoformat()
         }))
 
@@ -422,10 +426,11 @@ class WineFridgeController:
             'timestamp': time.time()
         }
 
+        # GREEN LED = action expected (remove bottle from here)
         self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
             "action": "set_leds",
             "source": "mqtt_handler",
-            "data": {"positions": [{"position": position, "color": "#FF0000", "brightness": 100}]},
+            "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100}]},
             "timestamp": datetime.now().isoformat()
         }))
 
@@ -506,7 +511,14 @@ class WineFridgeController:
             self.handle_bottle_removed(drawer_id, position)
 
     def handle_swap_event(self, drawer_id, position, event, weight):
-        """Handle events during swap operation"""
+        """
+        Handle events during swap operation with improved LED feedback
+
+        LED colors during swap:
+        - YELLOW: Original position to lift bottle from
+        - GREEN: Target position to place bottle
+        - BLUE blinking: Weighing in progress
+        """
 
         if event == 'removed':
             # Get bottle info from inventory
@@ -524,9 +536,10 @@ class WineFridgeController:
 
             if bottle_info:
                 self.swap_operations['bottles_removed'].append(bottle_info)
-                print(f"[SWAP] Bottle {len(self.swap_operations['bottles_removed'])} removed: {bottle_info['name']}")
+                bottle_num = len(self.swap_operations['bottles_removed'])
+                print(f"[SWAP] Bottle {bottle_num} removed: {bottle_info['name']}")
 
-                # Light up position for identification
+                # Keep YELLOW on lifted position
                 self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                     "action": "set_leds",
                     "source": "mqtt_handler",
@@ -558,6 +571,23 @@ class WineFridgeController:
                         {'bottle': bottle2, 'target_drawer': bottle1['drawer'], 'target_position': bottle1['position']}
                     ]
 
+                    # Change LED colors: GREEN on target position for first bottle, YELLOW on second
+                    # First target (where to place bottle1 - was bottle2's position) -> GREEN
+                    self.client.publish(f"winefridge/{bottle2['drawer']}/command", json.dumps({
+                        "action": "set_leds",
+                        "source": "mqtt_handler",
+                        "data": {"positions": [{"position": bottle2['position'], "color": "#00FF00", "brightness": 100}]},
+                        "timestamp": datetime.now().isoformat()
+                    }))
+
+                    # Keep YELLOW on first bottle's original position (where to place bottle2 later)
+                    self.client.publish(f"winefridge/{bottle1['drawer']}/command", json.dumps({
+                        "action": "set_leds",
+                        "source": "mqtt_handler",
+                        "data": {"positions": [{"position": bottle1['position'], "color": "#FFFF00", "brightness": 100}]},
+                        "timestamp": datetime.now().isoformat()
+                    }))
+
         elif event == 'placed':
             # Check if placement matches expected swap
             if len(self.swap_operations['bottles_to_place']) > 0:
@@ -565,6 +595,14 @@ class WineFridgeController:
                 for i, expected in enumerate(self.swap_operations['bottles_to_place']):
                     if expected['target_drawer'] == drawer_id and expected['target_position'] == position:
                         print(f"[SWAP] Bottle placed correctly in swapped position")
+
+                        # BLUE blinking during weighing
+                        self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                            "action": "set_leds",
+                            "source": "mqtt_handler",
+                            "data": {"positions": [{"position": position, "color": "#0000FF", "brightness": 100, "blink": True}]},
+                            "timestamp": datetime.now().isoformat()
+                        }))
 
                         # Update inventory with swapped bottle - preserve original weight
                         bottle_info = expected['bottle']
@@ -577,6 +615,14 @@ class WineFridgeController:
                         # Remove from pending placements
                         self.swap_operations['bottles_to_place'].pop(i)
 
+                        # After weighing, set to GREEN
+                        self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                            "action": "set_leds",
+                            "source": "mqtt_handler",
+                            "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100}]},
+                            "timestamp": datetime.now().isoformat()
+                        }))
+
                         # Notify UI
                         self.client.publish("winefridge/system/status", json.dumps({
                             "action": "bottle_event",
@@ -588,8 +634,24 @@ class WineFridgeController:
                             "timestamp": datetime.now().isoformat()
                         }))
 
+                        # If first bottle placed, change second target from YELLOW to GREEN
+                        if len(self.swap_operations['bottles_to_place']) == 1:
+                            remaining = self.swap_operations['bottles_to_place'][0]
+                            target_drawer = remaining['target_drawer']
+                            target_position = remaining['target_position']
+
+                            print(f"[SWAP] First bottle placed, now place second bottle at {target_drawer} #{target_position}")
+
+                            # Change from YELLOW to GREEN for second placement
+                            self.client.publish(f"winefridge/{target_drawer}/command", json.dumps({
+                                "action": "set_leds",
+                                "source": "mqtt_handler",
+                                "data": {"positions": [{"position": target_position, "color": "#00FF00", "brightness": 100}]},
+                                "timestamp": datetime.now().isoformat()
+                            }))
+
                         # If all bottles placed, swap complete
-                        if len(self.swap_operations['bottles_to_place']) == 0:
+                        elif len(self.swap_operations['bottles_to_place']) == 0:
                             print("[SWAP] ✓ Swap completed successfully!")
 
                             # Clear all LEDs
@@ -727,11 +789,11 @@ class WineFridgeController:
                 "timestamp": datetime.now().isoformat()
             }))
 
-            # Re-highlight correct position
+            # Re-highlight correct position (GREEN = place bottle here)
             self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
-                "data": {"positions": [{"position": op['expected_position'], "color": "#0000FF", "brightness": 100}]},
+                "data": {"positions": [{"position": op['expected_position'], "color": "#00FF00", "brightness": 100}]},
                 "timestamp": datetime.now().isoformat()
             }))
 
@@ -872,13 +934,19 @@ class WineFridgeController:
             op = self.pending_operations[op_id]
             print(f"[TIMEOUT] {op['type']}")
 
-            # Send timeout error
-            self.client.publish("winefridge/system/status", json.dumps({
+            # Send timeout error with close_screen flag for load operations
+            timeout_message = {
                 "action": "bottle_placed" if op['type'] == 'load' else "bottle_unloaded",
                 "source": "mqtt_handler",
-                "data": {"success": False, "error": "Timeout"},
+                "data": {
+                    "success": False,
+                    "error": "Timeout",
+                    "close_screen": True if op['type'] == 'load' else False  # Signal frontend to close load screen
+                },
                 "timestamp": datetime.now().isoformat()
-            }))
+            }
+
+            self.client.publish("winefridge/system/status", json.dumps(timeout_message))
 
             # Clear LEDs
             self.client.publish(f"winefridge/{op['drawer']}/command", json.dumps({
