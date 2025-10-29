@@ -258,11 +258,14 @@ class WineFridgeController:
         try:
             message = json.loads(msg.payload.decode())
             action = message.get('action')
-            source = message.get('source')
+            source = message.get('source', 'unknown')
 
             # Only log non-heartbeat messages
             if action != 'heartbeat':
-                print(f"[MQTT] {action} from {source}")
+                if source == 'unknown':
+                    print(f"[MQTT] {action} (no source field in message) - topic: {msg.topic}")
+                else:
+                    print(f"[MQTT] {action} from {source}")
 
             if msg.topic == 'winefridge/system/command':
                 self.handle_system_command(message)
@@ -752,42 +755,6 @@ class WineFridgeController:
             # Wrong position - immediate feedback
             print(f"[ERROR] Wrong placement! Expected #{op['expected_position']}, got #{position}")
 
-            # Track error count
-            if 'error_count' not in op:
-                op['error_count'] = 0
-            op['error_count'] += 1
-
-            # After 2 errors, mark position with white LED and cancel operation
-            if op['error_count'] >= 2:
-                print(f"[ERROR] Too many wrong placements ({op['error_count']}), cancelling operation")
-
-                # White LED on last wrong position to indicate system gave up
-                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                    "action": "set_leds",
-                    "source": "mqtt_handler",
-                    "data": {"positions": [{"position": position, "color": "#FFFFFF", "brightness": 100}]},
-                    "timestamp": datetime.now().isoformat()
-                }))
-
-                # Notify UI of too many errors
-                self.client.publish("winefridge/system/status", json.dumps({
-                    "action": "placement_error",
-                    "source": "mqtt_handler",
-                    "data": {
-                        "error": "too_many_errors",
-                        "drawer": drawer_id,
-                        "wrong_position": position,
-                        "correct_position": op['expected_position'],
-                        "wine_name": op['name'],
-                        "close_screen": True
-                    },
-                    "timestamp": datetime.now().isoformat()
-                }))
-
-                # Cancel operation
-                del self.pending_operations[op_id]
-                return
-
             # Red LED on wrong position
             self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                 "action": "set_leds",
@@ -805,8 +772,7 @@ class WineFridgeController:
                     "drawer": drawer_id,
                     "wrong_position": position,
                     "correct_position": op['expected_position'],
-                    "wine_name": op['name'],
-                    "error_count": op['error_count']
+                    "wine_name": op['name']
                 },
                 "timestamp": datetime.now().isoformat()
             }))
