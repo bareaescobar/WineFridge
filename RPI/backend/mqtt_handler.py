@@ -233,7 +233,7 @@ class WineFridgeController:
             "data": {"barcode": barcode},
             "timestamp": datetime.now().isoformat()
         }
-        self.client.publish("WineFridge/system/status", json.dumps(message))
+        self.client.publish("winefridge/system/status", json.dumps(message))
 
     def on_connect(self, client, userdata, flags, rc, properties):
         if rc == 0:
@@ -241,8 +241,8 @@ class WineFridgeController:
         else:
             print(f"[MQTT] ✗ Connection failed: {rc}")
 
-        client.subscribe("WineFridge/+/status")
-        client.subscribe("WineFridge/system/command")
+        client.subscribe("winefridge/+/status")
+        client.subscribe("winefridge/system/command")
         print("[MQTT] Subscribed")
 
     def on_disconnect(self, client, userdata, flags, rc, properties):
@@ -260,7 +260,7 @@ class WineFridgeController:
             if action != 'heartbeat':
                 print(f"[MQTT] {action} from {source}")
 
-            if msg.topic == 'WineFridge/system/command':
+            if msg.topic == 'winefridge/system/command':
                 self.handle_system_command(message)
             elif '/status' in msg.topic and action == 'bottle_event':
                 drawer_id = msg.topic.split('/')[1]
@@ -326,7 +326,7 @@ class WineFridgeController:
                 "data": {"error": "No empty positions available"},
                 "timestamp": datetime.now().isoformat()
             }
-            self.client.publish("WineFridge/system/status", json.dumps(error_msg))
+            self.client.publish("winefridge/system/status", json.dumps(error_msg))
             return
 
         print(f"[LOAD] → {drawer_id} #{position}")
@@ -343,21 +343,21 @@ class WineFridgeController:
         }
 
         # LED + expect commands
-        self.client.publish(f"WineFridge/{drawer_id}/command", json.dumps({
+        self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
             "action": "set_leds",
             "source": "mqtt_handler",
             "data": {"positions": [{"position": position, "color": "#0000FF", "brightness": 100}]},
             "timestamp": datetime.now().isoformat()
         }))
 
-        self.client.publish(f"WineFridge/{drawer_id}/command", json.dumps({
+        self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
             "action": "expect_bottle",
             "source": "mqtt_handler",
             "data": {"position": position, "barcode": barcode, "name": name, "timeout_ms": 30000},
             "timestamp": datetime.now().isoformat()
         }))
 
-        self.client.publish("WineFridge/system/status", json.dumps({
+        self.client.publish("winefridge/system/status", json.dumps({
             "action": "expect_bottle",
             "source": "mqtt_handler",
             "data": {"drawer": drawer_id, "position": position, "wine_name": name},
@@ -379,7 +379,7 @@ class WineFridgeController:
                 drawer_id, position = bottle_location
             else:
                 print(f"[ERROR] Bottle not found in specified drawer {preferred_drawer}")
-                self.client.publish("WineFridge/system/status", json.dumps({
+                self.client.publish("winefridge/system/status", json.dumps({
                     "action": "unload_error",
                     "source": "mqtt_handler",
                     "data": {"error": f"Bottle not found in drawer {preferred_drawer}"},
@@ -391,7 +391,7 @@ class WineFridgeController:
             bottle_location = self.find_bottle_in_inventory(barcode)
             if not bottle_location:
                 print(f"[ERROR] Bottle not found")
-                self.client.publish("WineFridge/system/status", json.dumps({
+                self.client.publish("winefridge/system/status", json.dumps({
                     "action": "unload_error",
                     "source": "mqtt_handler",
                     "data": {"error": "Bottle not found in inventory"},
@@ -404,7 +404,7 @@ class WineFridgeController:
 
         if drawer_id not in FUNCTIONAL_DRAWERS:
             print(f"[ERROR] {drawer_id} has no sensors")
-            self.client.publish("WineFridge/system/status", json.dumps({
+            self.client.publish("winefridge/system/status", json.dumps({
                 "action": "unload_error",
                 "source": "mqtt_handler",
                 "data": {"error": f"Drawer {drawer_id} has no weight sensors"},
@@ -422,14 +422,14 @@ class WineFridgeController:
             'timestamp': time.time()
         }
 
-        self.client.publish(f"WineFridge/{drawer_id}/command", json.dumps({
+        self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
             "action": "set_leds",
             "source": "mqtt_handler",
             "data": {"positions": [{"position": position, "color": "#FF0000", "brightness": 100}]},
             "timestamp": datetime.now().isoformat()
         }))
 
-        self.client.publish("WineFridge/system/status", json.dumps({
+        self.client.publish("winefridge/system/status", json.dumps({
             "action": "expect_removal",
             "source": "mqtt_handler",
             "data": {"drawer": drawer_id, "position": position, "wine_name": name},
@@ -450,7 +450,7 @@ class WineFridgeController:
         }
 
         # Notify UI that swap has started
-        self.client.publish("WineFridge/system/status", json.dumps({
+        self.client.publish("winefridge/system/status", json.dumps({
             "action": "swap_started",
             "source": "mqtt_handler",
             "timestamp": datetime.now().isoformat()
@@ -463,7 +463,7 @@ class WineFridgeController:
         # Clear all LEDs
         for bottle_info in self.swap_operations.get('bottles_removed', []):
             drawer_id = bottle_info['drawer']
-            self.client.publish(f"WineFridge/{drawer_id}/command", json.dumps({
+            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
                 "data": {"positions": []},
@@ -527,7 +527,7 @@ class WineFridgeController:
                 print(f"[SWAP] Bottle {len(self.swap_operations['bottles_removed'])} removed: {bottle_info['name']}")
 
                 # Light up position for identification
-                self.client.publish(f"WineFridge/{drawer_id}/command", json.dumps({
+                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                     "action": "set_leds",
                     "source": "mqtt_handler",
                     "data": {"positions": [{"position": position, "color": "#FFFF00", "brightness": 100}]},
@@ -535,7 +535,7 @@ class WineFridgeController:
                 }))
 
                 # Notify UI
-                self.client.publish("WineFridge/system/status", json.dumps({
+                self.client.publish("winefridge/system/status", json.dumps({
                     "action": "bottle_event",
                     "data": {
                         "event": "removed",
@@ -578,7 +578,7 @@ class WineFridgeController:
                         self.swap_operations['bottles_to_place'].pop(i)
 
                         # Notify UI
-                        self.client.publish("WineFridge/system/status", json.dumps({
+                        self.client.publish("winefridge/system/status", json.dumps({
                             "action": "bottle_event",
                             "data": {
                                 "event": "placed",
@@ -594,7 +594,7 @@ class WineFridgeController:
 
                             # Clear all LEDs
                             for bottle in self.swap_operations['bottles_removed']:
-                                self.client.publish(f"WineFridge/{bottle['drawer']}/command", json.dumps({
+                                self.client.publish(f"winefridge/{bottle['drawer']}/command", json.dumps({
                                     "action": "set_leds",
                                     "source": "mqtt_handler",
                                     "data": {"positions": []},
@@ -602,7 +602,7 @@ class WineFridgeController:
                                 }))
 
                             # Notify UI of success
-                            self.client.publish("WineFridge/system/status", json.dumps({
+                            self.client.publish("winefridge/system/status", json.dumps({
                                 "action": "swap_completed",
                                 "source": "mqtt_handler",
                                 "data": {"success": True},
@@ -645,7 +645,7 @@ class WineFridgeController:
             print(f"[ERROR] Wrong placement! Expected #{op['expected_position']}, got #{position}")
 
             # Red LED on wrong position
-            self.client.publish(f"WineFridge/{drawer_id}/command", json.dumps({
+            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
                 "data": {"positions": [{"position": position, "color": "#FF0000", "brightness": 100}]},
@@ -653,7 +653,7 @@ class WineFridgeController:
             }))
 
             # Notify UI immediately about wrong placement
-            self.client.publish("WineFridge/system/status", json.dumps({
+            self.client.publish("winefridge/system/status", json.dumps({
                 "action": "placement_error",
                 "source": "mqtt_handler",
                 "data": {
@@ -676,7 +676,7 @@ class WineFridgeController:
             self.update_inventory(drawer_id, position, op['barcode'], op['name'], weight, fill_percentage)
 
             # Clear LEDs
-            self.client.publish(f"WineFridge/{drawer_id}/command", json.dumps({
+            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
                 "data": {"positions": []},
@@ -684,7 +684,7 @@ class WineFridgeController:
             }))
 
             # Notify success with fill percentage
-            self.client.publish("WineFridge/system/status", json.dumps({
+            self.client.publish("winefridge/system/status", json.dumps({
                 "action": "bottle_placed",
                 "source": "mqtt_handler",
                 "data": {
@@ -720,7 +720,7 @@ class WineFridgeController:
             print(f"[REMOVED] Wrong bottle removed from #{position}")
 
             # Clear red LED
-            self.client.publish(f"WineFridge/{drawer_id}/command", json.dumps({
+            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
                 "data": {"positions": []},
@@ -728,7 +728,7 @@ class WineFridgeController:
             }))
 
             # Re-highlight correct position
-            self.client.publish(f"WineFridge/{drawer_id}/command", json.dumps({
+            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
                 "data": {"positions": [{"position": op['expected_position'], "color": "#0000FF", "brightness": 100}]},
@@ -740,7 +740,7 @@ class WineFridgeController:
                 del op['wrong_position']
 
             # Notify web that wrong bottle was removed
-            self.client.publish("WineFridge/system/status", json.dumps({
+            self.client.publish("winefridge/system/status", json.dumps({
                 "action": "wrong_bottle_removed",
                 "source": "mqtt_handler",
                 "data": {
@@ -767,14 +767,14 @@ class WineFridgeController:
 
         self.clear_inventory_position(drawer_id, position)
 
-        self.client.publish(f"WineFridge/{drawer_id}/command", json.dumps({
+        self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
             "action": "set_leds",
             "source": "mqtt_handler",
             "data": {"positions": []},
             "timestamp": datetime.now().isoformat()
         }))
 
-        self.client.publish("WineFridge/system/status", json.dumps({
+        self.client.publish("winefridge/system/status", json.dumps({
             "action": "bottle_unloaded",
             "source": "mqtt_handler",
             "data": {
@@ -802,7 +802,7 @@ class WineFridgeController:
             op = self.pending_operations[op_id]
             if 'wrong_position' in op:
                 # Clear all LEDs
-                self.client.publish(f"WineFridge/{op['drawer']}/command", json.dumps({
+                self.client.publish(f"winefridge/{op['drawer']}/command", json.dumps({
                     "action": "set_leds",
                     "source": "mqtt_handler",
                     "data": {"positions": []},
@@ -818,7 +818,7 @@ class WineFridgeController:
         self.last_scan_time = 0
 
         # Notify UI
-        self.client.publish("WineFridge/system/status", json.dumps({
+        self.client.publish("winefridge/system/status", json.dumps({
             "action": "retry_ready",
             "source": "mqtt_handler",
             "timestamp": datetime.now().isoformat()
@@ -873,7 +873,7 @@ class WineFridgeController:
             print(f"[TIMEOUT] {op['type']}")
 
             # Send timeout error
-            self.client.publish("WineFridge/system/status", json.dumps({
+            self.client.publish("winefridge/system/status", json.dumps({
                 "action": "bottle_placed" if op['type'] == 'load' else "bottle_unloaded",
                 "source": "mqtt_handler",
                 "data": {"success": False, "error": "Timeout"},
@@ -881,7 +881,7 @@ class WineFridgeController:
             }))
 
             # Clear LEDs
-            self.client.publish(f"WineFridge/{op['drawer']}/command", json.dumps({
+            self.client.publish(f"winefridge/{op['drawer']}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
                 "data": {"positions": []},
