@@ -50,8 +50,20 @@ const modalActions = {
       publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
     }
 
+    // If coming from success modal, send load_complete to change LED to white
+    const fromSuccessModal = loadBottleSuccessModal?.classList.contains('active')
+    if (fromSuccessModal) {
+      const payload = {
+        action: 'load_complete',
+        source: 'web',
+        timestamp: new Date().toISOString()
+      }
+      publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
+    }
+
     loadBottleInfoModal.classList.remove('active')
     loadBottleErrorModal.classList.remove('active')
+    loadBottleSuccessModal.classList.remove('active')
     scanCircle.classList.remove('active')
   },
 }
@@ -132,6 +144,25 @@ document.addEventListener('click', (event) => {
     modalActions[target](modalId)
   }
 })
+
+// Handle "Done" button - send load_complete and redirect to home
+const loadDoneBtn = document.getElementById('load-done-btn')
+if (loadDoneBtn) {
+  loadDoneBtn.addEventListener('click', () => {
+    console.log('[LOAD] Done clicked - completing load and going home')
+    const payload = {
+      action: 'load_complete',
+      source: 'web',
+      timestamp: new Date().toISOString()
+    }
+    publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
+
+    // Small delay to ensure message is sent before redirect
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 100)
+  })
+}
 
 connectMQTT({
   host: BROKER_URL,

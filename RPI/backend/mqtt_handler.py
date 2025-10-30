@@ -290,6 +290,8 @@ class WineFridgeController:
             self.cancel_swap()
         elif action == 'retry_placement':
             self.retry_placement(data)
+        elif action == 'load_complete':
+            self.complete_load_operation(data)
 
     def find_empty_position(self, preferred_drawer=None):
         """Find empty position, preferring specified drawer"""
@@ -776,11 +778,14 @@ class WineFridgeController:
             # Wrong position - immediate feedback
             print(f"[ERROR] Wrong placement! Expected #{op['expected_position']}, got #{position}")
 
-            # Red LED on wrong position
+            # RED LED on wrong position + GREEN BLINKING LED on correct position
             self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
-                "data": {"positions": [{"position": position, "color": "#FF0000", "brightness": 100}]},
+                "data": {"positions": [
+                    {"position": position, "color": "#FF0000", "brightness": 100, "blink": False},
+                    {"position": op['expected_position'], "color": "#00FF00", "brightness": 100, "blink": True}
+                ]},
                 "timestamp": datetime.now().isoformat()
             }))
 
@@ -814,27 +819,33 @@ class WineFridgeController:
             # Correct placement
             print(f"[PLACED] ✓ {drawer_id} #{position} - {fill_percentage}% full ({weight}g)")
 
-            self.update_inventory(drawer_id, position, op['barcode'], op['name'], weight, fill_percentage)
-
-            # Show SOLID green briefly to confirm correct placement
+            # BLUE blinking LED during weighing
             self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
-                "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100, "blink": False}]},
+                "data": {"positions": [{"position": position, "color": "#0000FF", "brightness": 100, "blink": True}]},
                 "timestamp": datetime.now().isoformat()
             }))
 
-            # Clear LEDs after brief delay
-            def clear_leds_delayed():
-                time.sleep(1)
+            # Update inventory
+            self.update_inventory(drawer_id, position, op['barcode'], op['name'], weight, fill_percentage)
+
+            # After weighing, show SOLID GREEN (bottle placed correctly, waiting for user to confirm)
+            def show_green_after_weighing():
+                time.sleep(0.5)  # Brief delay for blue blink visibility
                 self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                     "action": "set_leds",
                     "source": "mqtt_handler",
-                    "data": {"positions": []},
+                    "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100, "blink": False}]},
                     "timestamp": datetime.now().isoformat()
                 }))
 
-            threading.Thread(target=clear_leds_delayed, daemon=True).start()
+            threading.Thread(target=show_green_after_weighing, daemon=True).start()
+
+            # Store drawer and position for later LED change to white
+            op['confirmed_drawer'] = drawer_id
+            op['confirmed_position'] = position
+            op['confirmed'] = True  # Mark as ready for white LED after DONE
 
             # Notify success with fill percentage
             self.client.publish("winefridge/system/status", json.dumps({
@@ -860,7 +871,8 @@ class WineFridgeController:
             self.last_barcode = ""
             self.last_scan_time = 0
 
-            del self.pending_operations[op_id]
+            # Keep operation in pending until user clicks DONE (will change LED to white then)
+            # Do NOT delete the operation yet
 
     def handle_bottle_removed(self, drawer_id, position):
         """Handle bottle removal with wrong position detection"""
@@ -1028,6 +1040,31 @@ class WineFridgeController:
             "source": "mqtt_handler",
             "timestamp": datetime.now().isoformat()
         }))
+
+    def complete_load_operation(self, data):
+        """Handle load completion when user clicks DONE - change LED to white"""
+        print("[LOAD] User clicked DONE - changing LED to white...")
+
+        # Find the confirmed load operation
+        for op_id in list(self.pending_operations.keys()):
+            op = self.pending_operations[op_id]
+            if op.get('confirmed') and op.get('type') == 'load':
+                drawer_id = op['confirmed_drawer']
+                position = op['confirmed_position']
+
+                # Change LED from GREEN to WHITE (bottle present)
+                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                    "action": "set_leds",
+                    "source": "mqtt_handler",
+                    "data": {"positions": [{"position": position, "color": "#FFFFFF", "brightness": 100, "blink": False}]},
+                    "timestamp": datetime.now().isoformat()
+                }))
+
+                print(f"[LOAD] ✓ Completed - LED changed to WHITE at {drawer_id} #{position}")
+
+                # Clean up operation
+                del self.pending_operations[op_id]
+                break
 
     def clear_inventory_position(self, drawer_id, position):
         self.inventory = self.load_json('/home/plasticlab/WineFridge/RPI/database/inventory.json')
