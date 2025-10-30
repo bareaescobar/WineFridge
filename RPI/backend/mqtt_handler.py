@@ -1052,11 +1052,11 @@ class WineFridgeController:
                 drawer_id = op['confirmed_drawer']
                 position = op['confirmed_position']
 
-                # Change LED from GREEN to WHITE (bottle present)
+                # Change LED from GREEN to WHITE/OCCUPIED (bottle present) - using same color as firmware COLOR_OCCUPIED
                 self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                     "action": "set_leds",
                     "source": "mqtt_handler",
-                    "data": {"positions": [{"position": position, "color": "#FFFFFF", "brightness": 100, "blink": False}]},
+                    "data": {"positions": [{"position": position, "color": "#444444", "brightness": 100, "blink": False}]},
                     "timestamp": datetime.now().isoformat()
                 }))
 

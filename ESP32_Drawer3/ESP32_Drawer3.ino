@@ -706,10 +706,11 @@ void handleCommand(JsonDocument& doc) {
       uint8_t position = pos["position"];
       String colorStr = pos["color"];
       uint8_t brightness = pos["brightness"];
-      
+      bool blink = pos["blink"] | false;  // Read blink field, default to false if not present
+
       if (position >= 1 && position <= 9) {
         uint32_t color = strtol(colorStr.c_str() + 1, NULL, 16);
-        setLEDAnimation(position, color, brightness, false);
+        setLEDAnimation(position, color, brightness, blink);
       }
     }
   }
