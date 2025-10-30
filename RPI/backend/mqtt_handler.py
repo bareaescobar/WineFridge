@@ -585,21 +585,34 @@ class WineFridgeController:
                     ]
 
                     # Change LED colors: GREEN on target position for first bottle, YELLOW on second
-                    # First target (where to place bottle1 - was bottle2's position) -> GREEN
-                    self.client.publish(f"winefridge/{bottle2['drawer']}/command", json.dumps({
-                        "action": "set_leds",
-                        "source": "mqtt_handler",
-                        "data": {"positions": [{"position": bottle2['position'], "color": "#00FF00", "brightness": 100}]},
-                        "timestamp": datetime.now().isoformat()
-                    }))
+                    # If same drawer, send both positions in one command to avoid overwriting
+                    if bottle1['drawer'] == bottle2['drawer']:
+                        self.client.publish(f"winefridge/{bottle1['drawer']}/command", json.dumps({
+                            "action": "set_leds",
+                            "source": "mqtt_handler",
+                            "data": {"positions": [
+                                {"position": bottle2['position'], "color": "#00FF00", "brightness": 100},
+                                {"position": bottle1['position'], "color": "#FFFF00", "brightness": 100}
+                            ]},
+                            "timestamp": datetime.now().isoformat()
+                        }))
+                    else:
+                        # Different drawers, send separately
+                        # First target (where to place bottle1 - was bottle2's position) -> GREEN
+                        self.client.publish(f"winefridge/{bottle2['drawer']}/command", json.dumps({
+                            "action": "set_leds",
+                            "source": "mqtt_handler",
+                            "data": {"positions": [{"position": bottle2['position'], "color": "#00FF00", "brightness": 100}]},
+                            "timestamp": datetime.now().isoformat()
+                        }))
 
-                    # Keep YELLOW on first bottle's original position (where to place bottle2 later)
-                    self.client.publish(f"winefridge/{bottle1['drawer']}/command", json.dumps({
-                        "action": "set_leds",
-                        "source": "mqtt_handler",
-                        "data": {"positions": [{"position": bottle1['position'], "color": "#FFFF00", "brightness": 100}]},
-                        "timestamp": datetime.now().isoformat()
-                    }))
+                        # Keep YELLOW on first bottle's original position (where to place bottle2 later)
+                        self.client.publish(f"winefridge/{bottle1['drawer']}/command", json.dumps({
+                            "action": "set_leds",
+                            "source": "mqtt_handler",
+                            "data": {"positions": [{"position": bottle1['position'], "color": "#FFFF00", "brightness": 100}]},
+                            "timestamp": datetime.now().isoformat()
+                        }))
 
         elif event == 'placed':
             # Check if placement matches expected swap
@@ -669,9 +682,10 @@ class WineFridgeController:
                         elif len(self.swap_operations['bottles_to_place']) == 0:
                             print("[SWAP] ✓ Swap completed successfully!")
 
-                            # Clear all LEDs
-                            for bottle in self.swap_operations['bottles_removed']:
-                                self.client.publish(f"winefridge/{bottle['drawer']}/command", json.dumps({
+                            # Clear all LEDs (deduplicate drawers to avoid multiple commands to same drawer)
+                            drawers_to_clear = set(bottle['drawer'] for bottle in self.swap_operations['bottles_removed'])
+                            for drawer in drawers_to_clear:
+                                self.client.publish(f"winefridge/{drawer}/command", json.dumps({
                                     "action": "set_leds",
                                     "source": "mqtt_handler",
                                     "data": {"positions": []},
