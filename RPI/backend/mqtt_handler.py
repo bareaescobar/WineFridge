@@ -57,8 +57,8 @@ def find_serial_port():
 class WineFridgeController:
     def __init__(self):
         # Load databases
-        self.inventory = self.load_json('/home/plasticlab/WineFridge/RPI/database/inventory.json')
-        self.catalog = self.load_json('/home/plasticlab/WineFridge/RPI/database/wine-catalog.json')
+        self.inventory = self.load_json('/home/user/WineFridge/RPI/database/inventory.json')
+        self.catalog = self.load_json('/home/user/WineFridge/RPI/database/wine-catalog.json')
 
         # Track pending operations
         self.pending_operations = {}
@@ -380,7 +380,7 @@ class WineFridgeController:
         barcode = data.get('barcode')
         name = data.get('name', 'Unknown Wine')
         preferred_drawer = data.get('drawer')  # Get drawer from UI if specified
-        print(f"[UNLOAD] {name[:30]}...")
+        print(f"[UNLOAD] {name[:30]}... (barcode: {barcode})")
 
         # If drawer specified, search in that drawer first
         if preferred_drawer:
@@ -996,7 +996,7 @@ class WineFridgeController:
         }))
 
     def clear_inventory_position(self, drawer_id, position):
-        self.inventory = self.load_json('/home/plasticlab/WineFridge/RPI/database/inventory.json')
+        self.inventory = self.load_json('/home/user/WineFridge/RPI/database/inventory.json')
 
         if drawer_id in self.inventory.get("drawers", {}):
             if str(position) in self.inventory["drawers"][drawer_id].get("positions", {}):
@@ -1007,10 +1007,10 @@ class WineFridgeController:
                    for p in d.get("positions", {}).values() if p.get("occupied", False))
         self.inventory["total_bottles"] = total
 
-        self.save_json('/home/plasticlab/WineFridge/RPI/database/inventory.json', self.inventory)
+        self.save_json('/home/user/WineFridge/RPI/database/inventory.json', self.inventory)
 
     def update_inventory(self, drawer_id, position, barcode, name, weight, fill_percentage=None):
-        self.inventory = self.load_json('/home/plasticlab/WineFridge/RPI/database/inventory.json')
+        self.inventory = self.load_json('/home/user/WineFridge/RPI/database/inventory.json')
 
         if "drawers" not in self.inventory:
             self.inventory["drawers"] = {}
@@ -1036,7 +1036,7 @@ class WineFridgeController:
                    for p in d.get("positions", {}).values() if p.get("occupied", False))
         self.inventory["total_bottles"] = total
 
-        self.save_json('/home/plasticlab/WineFridge/RPI/database/inventory.json', self.inventory)
+        self.save_json('/home/user/WineFridge/RPI/database/inventory.json', self.inventory)
 
     def handle_timeout(self, op_id):
         if op_id in self.pending_operations:
