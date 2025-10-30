@@ -311,7 +311,7 @@ void setupNetwork() {
 }
 
 void setupOTA() {
-  ArduinoOTA.setHostname(DRAWER_ID);
+  ArduinoOTA.setHostname("WineFridge-Drawer7");  // Friendly name for OTA discovery
   ArduinoOTA.setPassword("winefridge2025");
   ArduinoOTA.setPort(3232);
   
