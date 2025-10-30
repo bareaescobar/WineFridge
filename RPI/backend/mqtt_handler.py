@@ -349,11 +349,11 @@ class WineFridgeController:
             'timestamp': time.time()
         }
 
-        # LED + expect commands (GREEN = action expected - place bottle here)
+        # LED + expect commands (GREEN BLINKING = action expected - place bottle here)
         self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
             "action": "set_leds",
             "source": "mqtt_handler",
-            "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100}]},
+            "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100, "blink": True}]},
             "timestamp": datetime.now().isoformat()
         }))
 
@@ -587,25 +587,25 @@ class WineFridgeController:
                         {'bottle': bottle2, 'target_drawer': bottle1['drawer'], 'target_position': bottle1['position']}
                     ]
 
-                    # Change LED colors: GREEN on target position for first bottle, YELLOW on second
+                    # Change LED colors: GREEN BLINKING on target position for first bottle, YELLOW on second
                     # If same drawer, send both positions in one command to avoid overwriting
                     if bottle1['drawer'] == bottle2['drawer']:
                         self.client.publish(f"winefridge/{bottle1['drawer']}/command", json.dumps({
                             "action": "set_leds",
                             "source": "mqtt_handler",
                             "data": {"positions": [
-                                {"position": bottle2['position'], "color": "#00FF00", "brightness": 100},
+                                {"position": bottle2['position'], "color": "#00FF00", "brightness": 100, "blink": True},
                                 {"position": bottle1['position'], "color": "#FFFF00", "brightness": 100}
                             ]},
                             "timestamp": datetime.now().isoformat()
                         }))
                     else:
                         # Different drawers, send separately
-                        # First target (where to place bottle1 - was bottle2's position) -> GREEN
+                        # First target (where to place bottle1 - was bottle2's position) -> GREEN BLINKING
                         self.client.publish(f"winefridge/{bottle2['drawer']}/command", json.dumps({
                             "action": "set_leds",
                             "source": "mqtt_handler",
-                            "data": {"positions": [{"position": bottle2['position'], "color": "#00FF00", "brightness": 100}]},
+                            "data": {"positions": [{"position": bottle2['position'], "color": "#00FF00", "brightness": 100, "blink": True}]},
                             "timestamp": datetime.now().isoformat()
                         }))
 
@@ -673,11 +673,11 @@ class WineFridgeController:
 
                             print(f"[SWAP] First bottle placed, now place second bottle at {target_drawer} #{target_position}")
 
-                            # Change from YELLOW to GREEN for second placement
+                            # Change from YELLOW to GREEN BLINKING for second placement
                             self.client.publish(f"winefridge/{target_drawer}/command", json.dumps({
                                 "action": "set_leds",
                                 "source": "mqtt_handler",
-                                "data": {"positions": [{"position": target_position, "color": "#00FF00", "brightness": 100}]},
+                                "data": {"positions": [{"position": target_position, "color": "#00FF00", "brightness": 100, "blink": True}]},
                                 "timestamp": datetime.now().isoformat()
                             }))
 
@@ -716,16 +716,17 @@ class WineFridgeController:
                 if not match_found:
                     print(f"[SWAP ERROR] Wrong placement at {drawer_id} #{position}")
 
-                    # Build LED positions: RED on wrong, GREEN/YELLOW on expected
+                    # Build LED positions: RED on wrong, GREEN BLINKING on expected
                     led_positions = [{"position": position, "color": "#FF0000", "brightness": 100}]
 
-                    # Add expected positions (GREEN for current targets)
+                    # Add expected positions (GREEN BLINKING for current targets)
                     for expected in self.swap_operations['bottles_to_place']:
                         if expected['target_drawer'] == drawer_id:
                             led_positions.append({
                                 "position": expected['target_position'],
                                 "color": "#00FF00",
-                                "brightness": 100
+                                "brightness": 100,
+                                "blink": True
                             })
 
                     self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
@@ -815,13 +816,25 @@ class WineFridgeController:
 
             self.update_inventory(drawer_id, position, op['barcode'], op['name'], weight, fill_percentage)
 
-            # Clear LEDs
+            # Show SOLID green briefly to confirm correct placement
             self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
-                "data": {"positions": []},
+                "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100, "blink": False}]},
                 "timestamp": datetime.now().isoformat()
             }))
+
+            # Clear LEDs after brief delay
+            def clear_leds_delayed():
+                time.sleep(1)
+                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                    "action": "set_leds",
+                    "source": "mqtt_handler",
+                    "data": {"positions": []},
+                    "timestamp": datetime.now().isoformat()
+                }))
+
+            threading.Thread(target=clear_leds_delayed, daemon=True).start()
 
             # Notify success with fill percentage
             self.client.publish("winefridge/system/status", json.dumps({
@@ -871,11 +884,11 @@ class WineFridgeController:
                 "timestamp": datetime.now().isoformat()
             }))
 
-            # Re-highlight correct position (GREEN = place bottle here)
+            # Re-highlight correct position (GREEN BLINKING = place bottle here)
             self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
-                "data": {"positions": [{"position": op['expected_position'], "color": "#00FF00", "brightness": 100}]},
+                "data": {"positions": [{"position": op['expected_position'], "color": "#00FF00", "brightness": 100, "blink": True}]},
                 "timestamp": datetime.now().isoformat()
             }))
 
