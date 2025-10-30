@@ -49,6 +49,10 @@ export default defineConfig({
   server: {
     open: './index.html',
     host: true,
+    fs: {
+      // Allow serving files from the parent RPI directory to access database
+      allow: [path.resolve(__dirname, '..')],
+    },
     watch: {
     ignored: ['**/database/inventory.json'],
   },
@@ -69,6 +73,7 @@ export default defineConfig({
     target: 'es2015',
     rollupOptions: {
       input: getHtmlEntryFiles(src),
+      external: [],
       output: {
         manualChunks: undefined,
         assetFileNames: ({ name }) => {
@@ -78,6 +83,9 @@ export default defineConfig({
           return '[name]-[hash][extname]'
         },
       },
+    },
+    commonjsOptions: {
+      include: [/node_modules/, /database/],
     },
   },
 })
