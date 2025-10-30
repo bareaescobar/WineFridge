@@ -351,18 +351,11 @@ class WineFridgeController:
             'timestamp': time.time()
         }
 
-        # LED + expect commands (GREEN BLINKING = action expected - place bottle here)
+        # LED GREEN BLINKING = action expected - place bottle here
         self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
             "action": "set_leds",
             "source": "mqtt_handler",
             "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100, "blink": True}]},
-            "timestamp": datetime.now().isoformat()
-        }))
-
-        self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-            "action": "expect_bottle",
-            "source": "mqtt_handler",
-            "data": {"position": position, "barcode": barcode, "name": name, "timeout_ms": 60000},
             "timestamp": datetime.now().isoformat()
         }))
 
