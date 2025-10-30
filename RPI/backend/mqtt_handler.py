@@ -269,9 +269,12 @@ class WineFridgeController:
 
             if msg.topic == 'winefridge/system/command':
                 self.handle_system_command(message)
-            elif '/status' in msg.topic and action == 'bottle_event':
+            elif '/status' in msg.topic:
                 drawer_id = msg.topic.split('/')[1]
-                self.handle_drawer_status(drawer_id, message)
+                if action == 'bottle_event':
+                    self.handle_drawer_status(drawer_id, message)
+                elif action == 'wrong_placement':
+                    self.handle_wrong_placement(drawer_id, message)
 
         except Exception as e:
             print(f"[ERROR] {e}")
@@ -528,6 +531,36 @@ class WineFridgeController:
             self.handle_bottle_placed(drawer_id, position, weight)
         elif event == 'removed':
             self.handle_bottle_removed(drawer_id, position)
+
+    def handle_wrong_placement(self, drawer_id, message):
+        """Handle wrong position placement during LOAD operation"""
+        data = message.get('data', {})
+        position = data.get('position')
+        expected_position = data.get('expected_position')
+
+        print(f"[LOAD] ❌ Wrong placement! Expected #{expected_position}, got #{position} in {drawer_id}")
+
+        # Find the current load operation
+        for op_id, op in list(self.pending_operations.items()):
+            if op.get('type') == 'load' and op.get('drawer') == drawer_id and op.get('position') == expected_position:
+                # Mark wrong position in operation
+                if 'wrong_positions' not in op:
+                    op['wrong_positions'] = []
+                if position not in op['wrong_positions']:
+                    op['wrong_positions'].append(position)
+
+                # Notify frontend to show error modal (frontend expects "placement_error")
+                self.client.publish("winefridge/system/status", json.dumps({
+                    "action": "placement_error",
+                    "source": "mqtt_handler",
+                    "data": {
+                        "drawer": drawer_id,
+                        "position": position,
+                        "expected_position": expected_position
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }))
+                break
 
     def handle_swap_event(self, drawer_id, position, event, weight):
         """
@@ -1031,7 +1064,7 @@ class WineFridgeController:
         }))
 
     def complete_load_operation(self, data):
-        """Handle load completion when user clicks DONE - change LED to white and clear all other LEDs"""
+        """Handle load completion when user clicks DONE - change LED to white, clear only load-related LEDs"""
         print("[LOAD] User clicked DONE - changing LED to white...")
 
         # Find the confirmed load operation
@@ -1041,23 +1074,22 @@ class WineFridgeController:
                 drawer_id = op['confirmed_drawer']
                 position = op['confirmed_position']
 
-                # First, clear ALL LEDs (turn off any red LEDs from wrong placement)
-                all_positions = [{"position": i, "color": "#000000", "brightness": 0, "blink": False} for i in range(1, 10)]
+                # Build list of LEDs to update
+                leds_to_update = []
+
+                # Turn off any wrong position LEDs (red)
+                if 'wrong_positions' in op:
+                    for wrong_pos in op['wrong_positions']:
+                        leds_to_update.append({"position": wrong_pos, "color": "#000000", "brightness": 0, "blink": False})
+
+                # Change correct position from GREEN to WHITE/OCCUPIED
+                leds_to_update.append({"position": position, "color": "#444444", "brightness": 100, "blink": False})
+
+                # Send single command with all LED changes
                 self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                     "action": "set_leds",
                     "source": "mqtt_handler",
-                    "data": {"positions": all_positions},
-                    "timestamp": datetime.now().isoformat()
-                }))
-
-                # Small delay to ensure clear command is processed first
-                time.sleep(0.1)
-
-                # Then set the correct position to WHITE/OCCUPIED
-                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                    "action": "set_leds",
-                    "source": "mqtt_handler",
-                    "data": {"positions": [{"position": position, "color": "#444444", "brightness": 100, "blink": False}]},
+                    "data": {"positions": leds_to_update},
                     "timestamp": datetime.now().isoformat()
                 }))
 
@@ -1069,7 +1101,7 @@ class WineFridgeController:
                     "timestamp": datetime.now().isoformat()
                 }))
 
-                print(f"[LOAD] ✓ Completed - LED changed to WHITE at {drawer_id} #{position}, all other LEDs cleared")
+                print(f"[LOAD] ✓ Completed - LED changed to WHITE at {drawer_id} #{position}")
 
                 # Clean up operation
                 del self.pending_operations[op_id]
