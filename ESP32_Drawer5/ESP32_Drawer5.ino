@@ -1,5 +1,5 @@
 /*
- * WineFridge Drawer ESP32_DRAWER - SIMPLIFIED v3.0.3
+ * WineFridge Drawer ESP32_DRAWER5 - SIMPLIFIED v3.0.4
  * SIMPLE WEIGHT SYSTEM: Tare after every change
  *
  * LOGIC:
@@ -7,8 +7,15 @@
  * 2. TARE immediately → Reset to 0
  * 3. Next bottle → Measure from 0 → No error accumulation
  *
- * Version: 3.0.3
- * Date: 28.10.2025 18:15h
+ * Version: 3.0.4
+ * Date: 30.10.2025 15:30h
+ *
+ * CHANGELOG v3.0.4:
+ * - Added expectedPosition tracking for LOAD operations
+ * - Wrong position detection WITHOUT weighing (immediate red LED)
+ * - Green blinking LED during weighing (changed from blue)
+ * - Fixed blink parameter reading from MQTT JSON
+ * - Friendly OTA hostname: "WineFridge-Drawer5"
  */
 
 #include <WiFi.h>
@@ -23,7 +30,7 @@
 
 // ==================== CONFIGURATION ====================
 #define DRAWER_ID "drawer_5"
-#define FIRMWARE_VERSION "3.0.3"
+#define FIRMWARE_VERSION "3.0.4"
 
 // Network
 #define WIFI_SSID "MOVISTAR-WIFI6-65F8"
@@ -34,7 +41,7 @@
 // Timing
 #define HEARTBEAT_INTERVAL 60000
 #define DEBOUNCE_TIME 50
-#define WEIGHT_STABILIZE_TIME 3000  // Increased from 300ms to 2000ms for accurate readings
+#define WEIGHT_STABILIZE_TIME 3000  // Increased to 3s for reliable weight readings
 #define SENSOR_UPDATE_INTERVAL 15000
 #define WATCHDOG_TIMEOUT 30  // Increased from 10 to 30 seconds to accommodate weight stabilization
 
@@ -145,6 +152,7 @@ struct SystemState {
   bool tempSensorReady;
   bool debugMode;
   unsigned long uptime;
+  uint8_t expectedPosition;        // Position expected for load operation (0 = none expected)
 } state;
 
 char mqtt_topic_status[64];
@@ -190,6 +198,7 @@ void setup() {
   memset(&state, 0, sizeof(state));
   memset(&positions, 0, sizeof(positions));
   state.debugMode = false;
+  state.expectedPosition = 0;  // No position expected initially
   
   snprintf(mqtt_topic_status, sizeof(mqtt_topic_status), "winefridge/%s/status", DRAWER_ID);
   snprintf(mqtt_topic_command, sizeof(mqtt_topic_command), "winefridge/%s/command", DRAWER_ID);
@@ -311,7 +320,7 @@ void setupNetwork() {
 }
 
 void setupOTA() {
-  ArduinoOTA.setHostname(DRAWER_ID);
+  ArduinoOTA.setHostname("WineFridge-Drawer5");  // Friendly name for OTA discovery
   ArduinoOTA.setPassword("winefridge2025");
   ArduinoOTA.setPort(3232);
   
@@ -458,12 +467,40 @@ void updatePositionStateMachine(uint8_t posIndex) {
         pos->stateTimer = millis();
         
         if (pos->debounceCount >= 5) {
-          pos->state = STATE_WEIGHING;
-          pos->stateTimer = millis();
-          setLEDAnimation(posIndex + 1, COLOR_PROCESSING, 100, true);
-          
-          if (state.debugMode) {
-            Serial.printf("[DEBUG] Pos %d: DEBOUNCING → WEIGHING\n", posIndex + 1);
+          // Check if this is wrong position during load operation
+          if (state.expectedPosition != 0 && (posIndex + 1) != state.expectedPosition) {
+            // Wrong position detected - don't weigh, just show red LED and send error
+            Serial.printf("[ERROR] Wrong position! Expected %d, got %d\n", state.expectedPosition, posIndex + 1);
+
+            // Set weight to default error value
+            pos->weight = WEIGHT_DEFAULT_ERROR;
+            state.individualWeights[posIndex] = pos->weight;
+
+            // Go to OCCUPIED state (not EMPTY) so LED turns off when bottle is removed
+            pos->state = STATE_OCCUPIED;
+
+            setLEDAnimation(posIndex + 1, COLOR_ERROR, 100, false);  // Red LED
+
+            // Send wrong placement event
+            StaticJsonDocument<256> wrongDoc;
+            wrongDoc["action"] = "wrong_placement";
+            wrongDoc["source"] = DRAWER_ID;
+            wrongDoc["data"]["position"] = posIndex + 1;
+            wrongDoc["data"]["expected_position"] = state.expectedPosition;
+            wrongDoc["timestamp"] = millis();
+
+            char wrongPayload[256];
+            serializeJson(wrongDoc, wrongPayload);
+            eventQueue.push(mqtt_topic_status, wrongPayload);
+          } else {
+            // Correct position or no expected position - proceed with weighing
+            pos->state = STATE_WEIGHING;
+            pos->stateTimer = millis();
+            setLEDAnimation(posIndex + 1, COLOR_AVAILABLE, 100, true);  // Green blinking during weighing
+
+            if (state.debugMode) {
+              Serial.printf("[DEBUG] Pos %d: DEBOUNCING → WEIGHING\n", posIndex + 1);
+            }
           }
         }
       }
@@ -471,41 +508,48 @@ void updatePositionStateMachine(uint8_t posIndex) {
     
     case STATE_WEIGHING:
       if (millis() - pos->stateTimer > WEIGHT_STABILIZE_TIME) {
+        esp_task_wdt_reset();  // Reset watchdog before heavy operations
+
         // Read weight change from 0 baseline
         float weightChange = readCurrentWeight();
-        
-        if (state.debugMode) {
-          Serial.printf("[DEBUG] Pos %d: Weight reading = %.1fg\n", posIndex + 1, weightChange);
-        }
-        
+
+        Serial.printf("[WEIGHT] Pos %d: Raw reading = %.1fg\n", posIndex + 1, weightChange);
+
         // Switch is authority - accept bottle
         if (weightChange >= WEIGHT_THRESHOLD) {
           pos->weight = weightChange;
+          Serial.printf("[WEIGHT] ✓ Pos %d: Accepted weight %.1fg\n", posIndex + 1, weightChange);
         } else {
           // Low weight detected but switch is active - use default
           pos->weight = WEIGHT_DEFAULT_ERROR;
           Serial.printf("[WEIGHT] ⚠️  Pos %d: Low weight (%.1fg), using default %dg\n",
                        posIndex + 1, weightChange, (int)WEIGHT_DEFAULT_ERROR);
         }
-        
+
         state.individualWeights[posIndex] = pos->weight;
         pos->state = STATE_OCCUPIED;
-        
+
+        // Clear expected position after successful placement
+        if (state.expectedPosition == (posIndex + 1)) {
+          state.expectedPosition = 0;
+        }
+
         setLEDAnimation(posIndex + 1, COLOR_OCCUPIED, 50, false);
-        
-        Serial.printf("[EVENT] ✓ Bottle PLACED at position %d (%.1fg)\n", 
-                     posIndex + 1, 
+
+        Serial.printf("[EVENT] ✓ Bottle PLACED at position %d (%.1fg)\n",
+                     posIndex + 1,
                      pos->weight);
-        
+
         // Send event
         queueBottleEvent(posIndex + 1, true, pos->weight);
-        
-        // CRITICAL: TARE IMMEDIATELY after measuring
-        delay(200);  // Small delay for stability
+
+        // CRITICAL: TARE IMMEDIATELY after measuring (non-blocking)
+        yield();  // Let other tasks run
         if (state.weightSensorReady && scale.is_ready()) {
           scale.tare();
           Serial.println("[WEIGHT] ✓ Tared - baseline reset to 0");
         }
+        esp_task_wdt_reset();  // Reset watchdog after operations
       }
       break;
     
@@ -533,27 +577,30 @@ void updatePositionStateMachine(uint8_t posIndex) {
         pos->stateTimer = millis();
         
         if (pos->debounceCount >= 5) {
+          esp_task_wdt_reset();  // Reset watchdog before operations
+
           float removedWeight = pos->weight;
-          
+
           pos->weight = 0.0;
           state.individualWeights[posIndex] = 0.0;
           pos->state = STATE_EMPTY;
-          
+
           setLEDAnimation(posIndex + 1, COLOR_OFF, 0, false);
-          
-          Serial.printf("[EVENT] ✓ Bottle REMOVED from position %d (was %.1fg)\n", 
-                       posIndex + 1, 
+
+          Serial.printf("[EVENT] ✓ Bottle REMOVED from position %d (was %.1fg)\n",
+                       posIndex + 1,
                        removedWeight);
-          
+
           // Send event
           queueBottleEvent(posIndex + 1, false, removedWeight);
-          
-          // CRITICAL: TARE IMMEDIATELY after removal
-          delay(200);
+
+          // CRITICAL: TARE IMMEDIATELY after removal (non-blocking)
+          yield();  // Let other tasks run
           if (state.weightSensorReady && scale.is_ready()) {
             scale.tare();
             Serial.println("[WEIGHT] ✓ Tared - baseline reset to 0");
           }
+          esp_task_wdt_reset();  // Reset watchdog after operations
         }
       }
       break;
@@ -701,7 +748,7 @@ void handleCommand(JsonDocument& doc) {
       uint8_t position = pos["position"];
       String colorStr = pos["color"];
       uint8_t brightness = pos["brightness"];
-      bool blink = pos["blink"] | false;  // Read blink field, default to false if not present
+      bool blink = pos.containsKey("blink") ? pos["blink"].as<bool>() : false;  // Read blink field, default to false if not present
 
       if (position >= 1 && position <= 9) {
         uint32_t color = strtol(colorStr.c_str() + 1, NULL, 16);
@@ -716,7 +763,7 @@ void handleCommand(JsonDocument& doc) {
   }
   else if (action == "expect_bottle") {
     uint8_t position = data["position"];
-    setLEDAnimation(position, COLOR_AVAILABLE, 100, false);
+    state.expectedPosition = position;  // Store expected position for wrong placement detection
     Serial.printf("[CMD] Expecting bottle at position %d\n", position);
   }
   else if (action == "read_sensors") {
