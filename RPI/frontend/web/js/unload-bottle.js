@@ -26,21 +26,32 @@ const bottleInfoContainer = unloadBottleInfoModal.querySelector('.block-bottle-i
 
 const port = 3000
 
-const inventory = fetchSync(`http://localhost:${port}/inventory`)
+let inventory = fetchSync(`http://localhost:${port}/inventory`)
+let products = []
 
-const barcodes = Object.values(inventory.drawers).flatMap((drawer) =>
-  Object.values(drawer.positions)
-    .filter((pos) => pos.occupied && pos.barcode)
-    .map((pos) => pos.barcode),
-)
-const barcodesSet = new Set(barcodes);
+function refreshInventory() {
+  inventory = fetchSync(`http://localhost:${port}/inventory`)
 
-const products = Object.entries(wineCatalog.wines)
-  .filter(([barcode]) => barcodesSet.has(barcode))
-  .map(([barcode, product]) => ({
-    ...product,
-    barcode,
-  }))
+  const barcodes = Object.values(inventory.drawers).flatMap((drawer) =>
+    Object.values(drawer.positions)
+      .filter((pos) => pos.occupied && pos.barcode)
+      .map((pos) => pos.barcode),
+  )
+  const barcodesSet = new Set(barcodes)
+
+  products = Object.entries(wineCatalog.wines)
+    .filter(([barcode]) => barcodesSet.has(barcode))
+    .map(([barcode, product]) => ({
+      ...product,
+      barcode,
+    }))
+
+  // Refresh the manual selection list
+  updateSuggestionTemplate(products, list)
+}
+
+// Initialize products on page load
+refreshInventory()
 
 const modalActions = {
   'unload-bottle-info-modal': (btn) => {
@@ -53,6 +64,11 @@ const modalActions = {
     updateBottleInfoModalWithPosition(pickedProduct, pickedProductPositionDetails, bottleInfoContainer)
   },
   'unload-bottle-welcome-modal': () => {
+    // Refresh inventory if coming from success modal (Take Wine More)
+    if (unloadBottleSuccessModal.classList.contains('active')) {
+      refreshInventory()
+    }
+
     unloadBottleSuggestModal.classList.contains('active') && unloadBottleSuggestModal.classList.remove('active')
     mealRecommendModal.classList.contains('active') && mealRecommendModal.classList.remove('active')
     unloadBottleInfoModal.classList.contains('active') && unloadBottleInfoModal.classList.remove('active')
@@ -87,8 +103,6 @@ const modalActions = {
     publish(TOPICS.WEB_TO_RPI_COMMAND, message)
   },
 }
-
-updateSuggestionTemplate(products, list)
 
 document.body.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-target]')
