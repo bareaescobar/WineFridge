@@ -483,7 +483,7 @@ void updatePositionStateMachine(uint8_t posIndex) {
 
             char wrongPayload[256];
             serializeJson(wrongDoc, wrongPayload);
-            eventQueue.enqueue(mqtt_topic_status, wrongPayload);
+            eventQueue.push(mqtt_topic_status, wrongPayload);
 
             // Return to empty state (don't weigh)
             pos->state = STATE_EMPTY;
