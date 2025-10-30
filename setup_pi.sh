@@ -106,9 +106,9 @@ echo "--- 13. Configurando Arduino-CLI y permisos ---"
 usermod -aG dialout $TARGET_USER
 echo "Usuario '$TARGET_USER' añadido al grupo 'dialout'."
 
-# Instalar arduino-cli (el binario)
-curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sudo sh
-echo "arduino-cli instalado."
+# [CORRECCIÓN] Forzar la instalación en /usr/local/bin, que está en el PATH por defecto
+curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sudo BINDIR=/usr/local/bin sh
+echo "arduino-cli instalado en /usr/local/bin."
 
 # Las siguientes configuraciones (placas, librerías) deben hacerse COMO EL USUARIO
 echo "Configurando arduino-cli para el usuario '$TARGET_USER'..."
@@ -128,11 +128,12 @@ sudo -u $TARGET_USER bash -c "
   arduino-cli lib install \"PubSubClient\"
   arduino-cli lib install \"Adafruit NeoPixel\"
   arduino-cli lib install \"ArduinoJson\"
-  arduino-cli lib install \"HX711-ADC\"
-  arduino-cli lib install \"Adafruit SHT31\"
-  # Nota: WiFi, Wire, ArduinoOTA, etc, ya vienen con el core de ESP32
+  arduino-cli lib install \"HX711\"
+  arduino-cli lib install \"Adafruit SHT31 Library\"
 "
 echo "Configuración de arduino-cli completada."
+
+# [CORREGIDO] Ya no se necesita el paso 14 (actualizar .bashrc) porque /usr/local/bin ya está en el PATH
 
 
 echo ""
@@ -143,7 +144,7 @@ echo "PASOS SIGUIENTES (MANUALES):"
 echo "1. Para activar el acceso remoto, ejecuta este comando:"
 echo "   rpi-connect signin"
 echo ""
-echo "2. REINICIA la Pi para que los cambios de grupo ('dialout')"
+echo "2. REINICIA la Pi para que todos los cambios de grupo ('dialout')"
 echo "   y hardware surtan efecto:"
 echo "   sudo reboot"
-echo "================================D=========================="
+echo "=========================================================="

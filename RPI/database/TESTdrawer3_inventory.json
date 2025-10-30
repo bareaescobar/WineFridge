@@ -1,0 +1,443 @@
+{
+  "version": "1.0",
+  "name": "Lounge Fridge",
+  "last_updated": "2025-10-30T10:00:00.000000",
+  "total_bottles": 26,
+  "drawers": {
+    "drawer_1": {
+      "zone": "Lower",
+      "temperature": 17,
+      "humidity": 60,
+      "mode": "rose",
+      "positions": {
+        "1": {
+          "occupied": true,
+          "barcode": "8422443001277",
+          "name": "Castaño Rosado Golosa Frescura",
+          "weight": 1050,
+          "placed_date": "2025-10-25T09:00:00Z",
+          "aging_days": 5
+        },
+        "2": {
+          "occupied": false
+        },
+        "3": {
+          "occupied": false
+        },
+        "4": {
+          "occupied": true,
+          "barcode": "8410591002604",
+          "name": "Cune Rosado",
+          "weight": 1170,
+          "placed_date": "2025-10-24T14:30:00Z",
+          "aging_days": 6
+        },
+        "5": {
+          "occupied": false
+        },
+        "6": {
+          "occupied": false
+        },
+        "7": {
+          "occupied": true,
+          "barcode": "8414601138383",
+          "name": "Fidencio Rosado",
+          "weight": 1050,
+          "placed_date": "2025-10-26T11:15:00Z",
+          "aging_days": 4
+        },
+        "8": {
+          "occupied": false
+        },
+        "9": {
+          "occupied": false
+        }
+      }
+    },
+    "drawer_2": {
+      "zone": "Lower",
+      "temperature": 17,
+      "humidity": 60,
+      "mode": "rose",
+      "positions": {
+        "1": {
+          "occupied": false
+        },
+        "2": {
+          "occupied": false
+        },
+        "3": {
+          "occupied": false
+        },
+        "4": {
+          "occupied": false
+        },
+        "5": {
+          "occupied": false
+        },
+        "6": {
+          "occupied": false
+        },
+        "7": {
+          "occupied": false
+        },
+        "8": {
+          "occupied": false
+        },
+        "9": {
+          "occupied": false
+        }
+      }
+    },
+    "drawer_3": {
+      "zone": "Lower",
+      "temperature": 17,
+      "humidity": 60,
+      "mode": "rose",
+      "positions": {
+        "1": {
+          "occupied": true,
+          "barcode": "8411543125013",
+          "name": "Viña Pomal Rosado",
+          "weight": 1100,
+          "placed_date": "2025-10-22T09:30:00Z",
+          "aging_days": 8
+        },
+        "2": {
+          "occupied": false
+        },
+        "3": {
+          "occupied": true,
+          "barcode": "8420342072022",
+          "name": "Protos Clarete Rosé Wine",
+          "weight": 1120,
+          "placed_date": "2025-10-25T13:00:00Z",
+          "aging_days": 5
+        },
+        "4": {
+          "occupied": false
+        },
+        "5": {
+          "occupied": false
+        },
+        "6": {
+          "occupied": true,
+          "barcode": "8410113009005",
+          "name": "Torres Viña Esmeralda Rosé",
+          "weight": 1070,
+          "placed_date": "2025-10-26T15:20:00Z",
+          "aging_days": 4
+        },
+        "7": {
+          "occupied": false
+        },
+        "8": {
+          "occupied": true,
+          "barcode": "8410337325035",
+          "name": "Montecillo Rosé",
+          "weight": 1110,
+          "placed_date": "2025-10-24T08:45:00Z",
+          "aging_days": 6
+        },
+        "9": {
+          "occupied": false
+        }
+      }
+    },
+    "drawer_4": {
+      "zone": "Middle",
+      "temperature": 15,
+      "humidity": 75,
+      "mode": "white",
+      "positions": {
+        "1": {
+          "occupied": true,
+          "barcode": "8413423380017",
+          "name": "Ramón Bilbao Verdejo",
+          "weight": 1100,
+          "placed_date": "2025-10-23T10:00:00Z",
+          "aging_days": 7
+        },
+        "2": {
+          "occupied": false
+        },
+        "3": {
+          "occupied": false
+        },
+        "4": {
+          "occupied": false
+        },
+        "5": {
+          "occupied": true,
+          "barcode": "8414219001000",
+          "name": "CUATRO RAYAS Verdejo Vendimia Nocturna",
+          "weight": 1100,
+          "placed_date": "2025-10-27T12:00:00Z",
+          "aging_days": 3
+        },
+        "6": {
+          "occupied": false
+        },
+        "7": {
+          "occupied": false
+        },
+        "8": {
+          "occupied": false
+        },
+        "9": {
+          "occupied": false
+        }
+      }
+    },
+    "drawer_5": {
+      "zone": "Middle",
+      "temperature": 15,
+      "humidity": 75,
+      "mode": "white",
+      "positions": {
+        "1": {
+          "occupied": false
+        },
+        "2": {
+          "occupied": true,
+          "barcode": "8410310603501",
+          "name": "Hoya de Cadenas Chardonnay Sauvignon Blanc",
+          "weight": 1100,
+          "placed_date": "2025-10-26T09:15:00Z",
+          "aging_days": 4
+        },
+        "3": {
+          "occupied": false
+        },
+        "4": {
+          "occupied": true,
+          "barcode": "8410113556776",
+          "name": "Celeste Verdejo",
+          "weight": 1185,
+          "placed_date": "2025-10-25T11:30:00Z",
+          "aging_days": 5
+        },
+        "5": {
+          "occupied": false
+        },
+        "6": {
+          "occupied": true,
+          "barcode": "8414219000737",
+          "name": "CUATRO RAYAS Pampano Organic Afrutado Verdejo",
+          "weight": 1100,
+          "placed_date": "2025-10-24T14:00:00Z",
+          "aging_days": 6
+        },
+        "7": {
+          "occupied": false
+        },
+        "8": {
+          "occupied": false
+        },
+        "9": {
+          "occupied": true,
+          "barcode": "B08KSSB4D2",
+          "name": "Señorío de los Llanos Verdejo",
+          "weight": 1100,
+          "placed_date": "2025-10-27T16:45:00Z",
+          "aging_days": 3
+        }
+      }
+    },
+    "drawer_6": {
+      "zone": "Middle",
+      "temperature": 15,
+      "humidity": 75,
+      "mode": "white",
+      "positions": {
+        "1": {
+          "occupied": false
+        },
+        "2": {
+          "occupied": false
+        },
+        "3": {
+          "occupied": true,
+          "barcode": "8410310616907",
+          "name": "Finca del Mar Verdejo",
+          "weight": 1100,
+          "placed_date": "2025-10-26T13:20:00Z",
+          "aging_days": 4
+        },
+        "4": {
+          "occupied": false
+        },
+        "5": {
+          "occupied": false
+        },
+        "6": {
+          "occupied": false
+        },
+        "7": {
+          "occupied": true,
+          "barcode": "8414219063213",
+          "name": "CUATRO RAYAS Cantarranas Verdejo",
+          "weight": 1185,
+          "placed_date": "2025-10-25T15:00:00Z",
+          "aging_days": 5
+        },
+        "8": {
+          "occupied": false
+        },
+        "9": {
+          "occupied": false
+        }
+      }
+    },
+    "drawer_7": {
+      "zone": "Upper",
+      "temperature": 16,
+      "humidity": 65,
+      "mode": "red",
+      "positions": {
+        "1": {
+          "occupied": false
+        },
+        "2": {
+          "occupied": true,
+          "barcode": "8410337311038",
+          "name": "Viña Cumbrero Crianza",
+          "weight": 1120,
+          "placed_date": "2025-10-24T10:30:00Z",
+          "aging_days": 6
+        },
+        "3": {
+          "occupied": false
+        },
+        "4": {
+          "occupied": true,
+          "barcode": "8420906059308",
+          "name": "Montesierra Young Red Wine",
+          "weight": 1150,
+          "placed_date": "2025-10-25T14:15:00Z",
+          "aging_days": 5
+        },
+        "5": {
+          "occupied": false
+        },
+        "6": {
+          "occupied": true,
+          "barcode": "8410310606168",
+          "name": "Hoya de Cadenas Cabernet Sauvignon Crianza",
+          "weight": 1150,
+          "placed_date": "2025-10-26T11:00:00Z",
+          "aging_days": 4
+        },
+        "7": {
+          "occupied": false
+        },
+        "8": {
+          "occupied": false
+        },
+        "9": {
+          "occupied": true,
+          "barcode": "8410261111025",
+          "name": "Pata Negra Crianza",
+          "weight": 1120,
+          "placed_date": "2025-10-27T09:30:00Z",
+          "aging_days": 3
+        }
+      }
+    },
+    "drawer_8": {
+      "zone": "Upper",
+      "temperature": 16,
+      "humidity": 65,
+      "mode": "red",
+      "positions": {
+        "1": {
+          "occupied": true,
+          "barcode": "8421216194451",
+          "name": "Laudum Monastrell Roble",
+          "weight": 1120,
+          "placed_date": "2025-10-23T13:45:00Z",
+          "aging_days": 7
+        },
+        "2": {
+          "occupied": false
+        },
+        "3": {
+          "occupied": false
+        },
+        "4": {
+          "occupied": false
+        },
+        "5": {
+          "occupied": true,
+          "barcode": "8411528001301",
+          "name": "Bodegas Aragonesas Solo Syrah Tirio",
+          "weight": 1120,
+          "placed_date": "2025-10-24T16:30:00Z",
+          "aging_days": 6
+        },
+        "6": {
+          "occupied": false
+        },
+        "7": {
+          "occupied": true,
+          "barcode": "8410310604249",
+          "name": "Finca del Mar Cabernet Sauvignon Crianza",
+          "weight": 1150,
+          "placed_date": "2025-10-26T14:00:00Z",
+          "aging_days": 4
+        },
+        "8": {
+          "occupied": false
+        },
+        "9": {
+          "occupied": false
+        }
+      }
+    },
+    "drawer_9": {
+      "zone": "Upper",
+      "temperature": 16,
+      "humidity": 65,
+      "mode": "red",
+      "positions": {
+        "1": {
+          "occupied": false
+        },
+        "2": {
+          "occupied": false
+        },
+        "3": {
+          "occupied": true,
+          "barcode": "8410415520628",
+          "name": "Señorío de los Llanos Reserva",
+          "weight": 1120,
+          "placed_date": "2025-10-25T10:15:00Z",
+          "aging_days": 5
+        },
+        "4": {
+          "occupied": false
+        },
+        "5": {
+          "occupied": false
+        },
+        "6": {
+          "occupied": false
+        },
+        "7": {
+          "occupied": true,
+          "barcode": "8420209033869",
+          "name": "Silanus Young Red",
+          "weight": 1110,
+          "placed_date": "2025-10-27T15:30:00Z",
+          "aging_days": 3
+        },
+        "8": {
+          "occupied": false
+        },
+        "9": {
+          "occupied": false
+        }
+      }
+    }
+  }
+}
