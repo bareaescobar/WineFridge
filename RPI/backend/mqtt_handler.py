@@ -448,7 +448,10 @@ class WineFridgeController:
             "timestamp": datetime.now().isoformat()
         }))
 
-        threading.Timer(30, self.handle_timeout, [op_id]).start()
+        # Start timeout timer and store it
+        timer = threading.Timer(60, self.handle_timeout, [op_id])
+        timer.start()
+        self.pending_operations[op_id]['timer'] = timer
 
     def start_swap_bottles(self):
         """Start swap bottle operation"""
@@ -967,6 +970,10 @@ class WineFridgeController:
             },
             "timestamp": datetime.now().isoformat()
         }))
+
+        # Cancel timeout timer
+        if 'timer' in op:
+            op['timer'].cancel()
 
         # Reset scanner
         self.last_barcode = ""
