@@ -39,6 +39,17 @@ const modalActions = {
     publish(TOPICS.WEB_TO_RPI_COMMAND, message)
   },
   'load-bottle-welcome-modal': () => {
+    // If coming from error modal, send retry_placement to backend
+    const fromErrorModal = loadBottleErrorModal?.classList.contains('active')
+    if (fromErrorModal) {
+      const payload = {
+        action: 'retry_placement',
+        source: 'web',
+        timestamp: new Date().toISOString()
+      }
+      publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
+    }
+
     loadBottleInfoModal.classList.remove('active')
     loadBottleErrorModal.classList.remove('active')
     scanCircle.classList.remove('active')
