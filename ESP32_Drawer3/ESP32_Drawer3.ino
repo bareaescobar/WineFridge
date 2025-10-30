@@ -145,6 +145,7 @@ struct SystemState {
   bool tempSensorReady;
   bool debugMode;
   unsigned long uptime;
+  uint8_t expectedPosition;        // Position expected for load operation (0 = none expected)
 } state;
 
 char mqtt_topic_status[64];
@@ -190,6 +191,7 @@ void setup() {
   memset(&state, 0, sizeof(state));
   memset(&positions, 0, sizeof(positions));
   state.debugMode = false;
+  state.expectedPosition = 0;  // No position expected initially
   
   snprintf(mqtt_topic_status, sizeof(mqtt_topic_status), "winefridge/%s/status", DRAWER_ID);
   snprintf(mqtt_topic_command, sizeof(mqtt_topic_command), "winefridge/%s/command", DRAWER_ID);
@@ -458,12 +460,36 @@ void updatePositionStateMachine(uint8_t posIndex) {
         pos->stateTimer = millis();
         
         if (pos->debounceCount >= 5) {
-          pos->state = STATE_WEIGHING;
-          pos->stateTimer = millis();
-          setLEDAnimation(posIndex + 1, COLOR_PROCESSING, 100, true);
-          
-          if (state.debugMode) {
-            Serial.printf("[DEBUG] Pos %d: DEBOUNCING → WEIGHING\n", posIndex + 1);
+          // Check if this is wrong position during load operation
+          if (state.expectedPosition != 0 && (posIndex + 1) != state.expectedPosition) {
+            // Wrong position detected - don't weigh, just show red LED and send error
+            Serial.printf("[ERROR] Wrong position! Expected %d, got %d\n", state.expectedPosition, posIndex + 1);
+            setLEDAnimation(posIndex + 1, COLOR_ERROR, 100, false);  // Red LED
+
+            // Send wrong placement event
+            StaticJsonDocument<256> wrongDoc;
+            wrongDoc["action"] = "wrong_placement";
+            wrongDoc["source"] = DRAWER_ID;
+            wrongDoc["data"]["position"] = posIndex + 1;
+            wrongDoc["data"]["expected_position"] = state.expectedPosition;
+            wrongDoc["timestamp"] = millis();
+
+            char wrongPayload[256];
+            serializeJson(wrongDoc, wrongPayload);
+            eventQueue.enqueue(mqtt_topic_status, wrongPayload);
+
+            // Return to empty state (don't weigh)
+            pos->state = STATE_EMPTY;
+            pos->debounceCount = 0;
+          } else {
+            // Correct position or no expected position - proceed with weighing
+            pos->state = STATE_WEIGHING;
+            pos->stateTimer = millis();
+            setLEDAnimation(posIndex + 1, COLOR_AVAILABLE, 100, true);  // Green blinking during weighing
+
+            if (state.debugMode) {
+              Serial.printf("[DEBUG] Pos %d: DEBOUNCING → WEIGHING\n", posIndex + 1);
+            }
           }
         }
       }
@@ -491,6 +517,11 @@ void updatePositionStateMachine(uint8_t posIndex) {
 
         state.individualWeights[posIndex] = pos->weight;
         pos->state = STATE_OCCUPIED;
+
+        // Clear expected position after successful placement
+        if (state.expectedPosition == (posIndex + 1)) {
+          state.expectedPosition = 0;
+        }
 
         setLEDAnimation(posIndex + 1, COLOR_OCCUPIED, 50, false);
 
@@ -721,7 +752,7 @@ void handleCommand(JsonDocument& doc) {
   }
   else if (action == "expect_bottle") {
     uint8_t position = data["position"];
-    setLEDAnimation(position, COLOR_AVAILABLE, 100, false);
+    state.expectedPosition = position;  // Store expected position for wrong placement detection
     Serial.printf("[CMD] Expecting bottle at position %d\n", position);
   }
   else if (action == "read_sensors") {

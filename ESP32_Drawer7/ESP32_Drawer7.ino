@@ -134,6 +134,7 @@ Adafruit_SHT31 sht31 = Adafruit_SHT31();
 BottlePosition positions[9];
 MQTTQueue eventQueue;
 volatile bool otaInProgress = false;
+int expectedPosition = -1;  // Track expected bottle position (0-8), -1 = no expectation
 
 struct SystemState {
   float individualWeights[9];      // Only store individual weights
@@ -458,12 +459,32 @@ void updatePositionStateMachine(uint8_t posIndex) {
         pos->stateTimer = millis();
         
         if (pos->debounceCount >= 5) {
-          pos->state = STATE_WEIGHING;
-          pos->stateTimer = millis();
-          setLEDAnimation(posIndex + 1, COLOR_PROCESSING, 100, true);
-          
-          if (state.debugMode) {
-            Serial.printf("[DEBUG] Pos %d: DEBOUNCING → WEIGHING\n", posIndex + 1);
+          // Check if this is the wrong position
+          if (expectedPosition != -1 && expectedPosition != posIndex) {
+            // Wrong position detected - skip weighing
+            pos->weight = WEIGHT_DEFAULT_ERROR;
+            state.individualWeights[posIndex] = pos->weight;
+            pos->state = STATE_OCCUPIED;
+
+            setLEDAnimation(posIndex + 1, COLOR_ERROR, 100, false);
+
+            Serial.printf("[EVENT] ⚠️  Wrong position! Expected %d, got %d (%.1fg)\n",
+                         expectedPosition + 1, posIndex + 1, pos->weight);
+
+            queueBottleEvent(posIndex + 1, true, pos->weight);
+
+            if (state.debugMode) {
+              Serial.printf("[DEBUG] Pos %d: DEBOUNCING → OCCUPIED (wrong position)\n", posIndex + 1);
+            }
+          } else {
+            // Correct position or no expectation - proceed to weighing
+            pos->state = STATE_WEIGHING;
+            pos->stateTimer = millis();
+            setLEDAnimation(posIndex + 1, COLOR_PROCESSING, 100, true);
+
+            if (state.debugMode) {
+              Serial.printf("[DEBUG] Pos %d: DEBOUNCING → WEIGHING\n", posIndex + 1);
+            }
           }
         }
       }
@@ -499,7 +520,10 @@ void updatePositionStateMachine(uint8_t posIndex) {
         
         // Send event
         queueBottleEvent(posIndex + 1, true, pos->weight);
-        
+
+        // Clear expected position after successful placement
+        expectedPosition = -1;
+
         // CRITICAL: TARE IMMEDIATELY after measuring
         delay(200);  // Small delay for stability
         if (state.weightSensorReady && scale.is_ready()) {
@@ -716,6 +740,7 @@ void handleCommand(JsonDocument& doc) {
   }
   else if (action == "expect_bottle") {
     uint8_t position = data["position"];
+    expectedPosition = position - 1;  // Store expected position index (0-8)
     setLEDAnimation(position, COLOR_AVAILABLE, 100, false);
     Serial.printf("[CMD] Expecting bottle at position %d\n", position);
   }

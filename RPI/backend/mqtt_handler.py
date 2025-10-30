@@ -359,6 +359,14 @@ class WineFridgeController:
             "timestamp": datetime.now().isoformat()
         }))
 
+        # Tell ESP32 which position to expect (so it can detect wrong placement without weighing)
+        self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+            "action": "expect_bottle",
+            "source": "mqtt_handler",
+            "data": {"position": position},
+            "timestamp": datetime.now().isoformat()
+        }))
+
         self.client.publish("winefridge/system/status", json.dumps({
             "action": "expect_bottle",
             "source": "mqtt_handler",
@@ -812,28 +820,16 @@ class WineFridgeController:
             # Correct placement
             print(f"[PLACED] ✓ {drawer_id} #{position} - {fill_percentage}% full ({weight}g)")
 
-            # BLUE blinking LED during weighing
-            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                "action": "set_leds",
-                "source": "mqtt_handler",
-                "data": {"positions": [{"position": position, "color": "#0000FF", "brightness": 100, "blink": True}]},
-                "timestamp": datetime.now().isoformat()
-            }))
-
             # Update inventory
             self.update_inventory(drawer_id, position, op['barcode'], op['name'], weight, fill_percentage)
 
-            # After weighing, show SOLID GREEN (bottle placed correctly, waiting for user to confirm)
-            def show_green_after_weighing():
-                time.sleep(0.5)  # Brief delay for blue blink visibility
-                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                    "action": "set_leds",
-                    "source": "mqtt_handler",
-                    "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100, "blink": False}]},
-                    "timestamp": datetime.now().isoformat()
-                }))
-
-            threading.Thread(target=show_green_after_weighing, daemon=True).start()
+            # Show SOLID GREEN (ESP32 was showing green blinking during weighing, now show solid)
+            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                "action": "set_leds",
+                "source": "mqtt_handler",
+                "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100, "blink": False}]},
+                "timestamp": datetime.now().isoformat()
+            }))
 
             # Store drawer and position for later LED change to white
             op['confirmed_drawer'] = drawer_id
