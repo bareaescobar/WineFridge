@@ -471,6 +471,14 @@ void updatePositionStateMachine(uint8_t posIndex) {
           if (state.expectedPosition != 0 && (posIndex + 1) != state.expectedPosition) {
             // Wrong position detected - don't weigh, just show red LED and send error
             Serial.printf("[ERROR] Wrong position! Expected %d, got %d\n", state.expectedPosition, posIndex + 1);
+
+            // Set weight to default error value
+            pos->weight = WEIGHT_DEFAULT_ERROR;
+            state.individualWeights[posIndex] = pos->weight;
+
+            // Go to OCCUPIED state (not EMPTY) so LED turns off when bottle is removed
+            pos->state = STATE_OCCUPIED;
+
             setLEDAnimation(posIndex + 1, COLOR_ERROR, 100, false);  // Red LED
 
             // Send wrong placement event
@@ -484,10 +492,6 @@ void updatePositionStateMachine(uint8_t posIndex) {
             char wrongPayload[256];
             serializeJson(wrongDoc, wrongPayload);
             eventQueue.push(mqtt_topic_status, wrongPayload);
-
-            // Return to empty state (don't weigh)
-            pos->state = STATE_EMPTY;
-            pos->debounceCount = 0;
           } else {
             // Correct position or no expected position - proceed with weighing
             pos->state = STATE_WEIGHING;

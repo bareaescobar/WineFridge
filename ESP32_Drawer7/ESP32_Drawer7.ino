@@ -482,7 +482,7 @@ void updatePositionStateMachine(uint8_t posIndex) {
             // Correct position or no expectation - proceed to weighing
             pos->state = STATE_WEIGHING;
             pos->stateTimer = millis();
-            setLEDAnimation(posIndex + 1, COLOR_PROCESSING, 100, true);
+            setLEDAnimation(posIndex + 1, COLOR_AVAILABLE, 100, true);  // Green blinking during weighing
 
             if (state.debugMode) {
               Serial.printf("[DEBUG] Pos %d: DEBOUNCING → WEIGHING\n", posIndex + 1);

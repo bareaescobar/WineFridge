@@ -1031,7 +1031,7 @@ class WineFridgeController:
         }))
 
     def complete_load_operation(self, data):
-        """Handle load completion when user clicks DONE - change LED to white"""
+        """Handle load completion when user clicks DONE - change LED to white and clear all other LEDs"""
         print("[LOAD] User clicked DONE - changing LED to white...")
 
         # Find the confirmed load operation
@@ -1041,7 +1041,19 @@ class WineFridgeController:
                 drawer_id = op['confirmed_drawer']
                 position = op['confirmed_position']
 
-                # Change LED from GREEN to WHITE/OCCUPIED (bottle present) - using same color as firmware COLOR_OCCUPIED
+                # First, clear ALL LEDs (turn off any red LEDs from wrong placement)
+                all_positions = [{"position": i, "color": "#000000", "brightness": 0, "blink": False} for i in range(1, 10)]
+                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                    "action": "set_leds",
+                    "source": "mqtt_handler",
+                    "data": {"positions": all_positions},
+                    "timestamp": datetime.now().isoformat()
+                }))
+
+                # Small delay to ensure clear command is processed first
+                time.sleep(0.1)
+
+                # Then set the correct position to WHITE/OCCUPIED
                 self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                     "action": "set_leds",
                     "source": "mqtt_handler",
@@ -1049,7 +1061,15 @@ class WineFridgeController:
                     "timestamp": datetime.now().isoformat()
                 }))
 
-                print(f"[LOAD] ✓ Completed - LED changed to WHITE at {drawer_id} #{position}")
+                # Reset expectedPosition to 0 (no expectation)
+                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                    "action": "expect_bottle",
+                    "source": "mqtt_handler",
+                    "data": {"position": 0},
+                    "timestamp": datetime.now().isoformat()
+                }))
+
+                print(f"[LOAD] ✓ Completed - LED changed to WHITE at {drawer_id} #{position}, all other LEDs cleared")
 
                 # Clean up operation
                 del self.pending_operations[op_id]
