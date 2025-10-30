@@ -360,7 +360,7 @@ class WineFridgeController:
         self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
             "action": "expect_bottle",
             "source": "mqtt_handler",
-            "data": {"position": position, "barcode": barcode, "name": name, "timeout_ms": 30000},
+            "data": {"position": position, "barcode": barcode, "name": name, "timeout_ms": 60000},
             "timestamp": datetime.now().isoformat()
         }))
 
@@ -371,7 +371,10 @@ class WineFridgeController:
             "timestamp": datetime.now().isoformat()
         }))
 
-        threading.Timer(30, self.handle_timeout, [op_id]).start()
+        # Start timeout timer and store it so we can cancel/reset it
+        timer = threading.Timer(60, self.handle_timeout, [op_id])
+        timer.start()
+        op['timer'] = timer
 
     def start_bottle_unload(self, data):
         barcode = data.get('barcode')
@@ -777,6 +780,15 @@ class WineFridgeController:
                 "timestamp": datetime.now().isoformat()
             }))
 
+            # Reset timeout timer
+            if 'timer' in op:
+                op['timer'].cancel()
+                print("[TIMEOUT] Cancelled old timer, starting new 60s timer")
+
+            new_timer = threading.Timer(60, self.handle_timeout, [op_id])
+            new_timer.start()
+            op['timer'] = new_timer
+
             # Keep operation pending but mark the wrong position
             op['wrong_position'] = position
 
@@ -809,6 +821,10 @@ class WineFridgeController:
                 },
                 "timestamp": datetime.now().isoformat()
             }))
+
+            # Cancel timeout timer
+            if 'timer' in op:
+                op['timer'].cancel()
 
             # Reset scanner
             self.last_barcode = ""
@@ -952,6 +968,10 @@ class WineFridgeController:
         for op_id in list(self.pending_operations.keys()):
             op = self.pending_operations[op_id]
             if 'wrong_position' in op:
+                # Cancel timeout timer
+                if 'timer' in op:
+                    op['timer'].cancel()
+
                 # Clear all LEDs
                 self.client.publish(f"winefridge/{op['drawer']}/command", json.dumps({
                     "action": "set_leds",
