@@ -14,7 +14,6 @@ fi
 set -e
 
 # 3. Definir directorios
-# Encuentra el directorio donde se está ejecutando el script
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 USER_HOME=$(eval echo "~$TARGET_USER")
 
@@ -22,8 +21,8 @@ USER_HOME=$(eval echo "~$TARGET_USER")
 echo "--- 1. Actualizando e instalando paquetes APT ---"
 apt update
 apt upgrade -y
-# Paquetes: Node, MQTT, Git, y los de Python para el handler
-apt install nodejs npm mosquitto mosquitto-clients git python3-paho-mqtt python3-serial -y
+# Paquetes: Node, MQTT, Git, Python y curl (para arduino-cli)
+apt install nodejs npm mosquitto mosquitto-clients git python3-paho-mqtt python3-serial curl -y
 
 # 5. Instalar paquetes globales de NPM (PM2)
 echo "--- 2. Instalando PM2 globalmente ---"
@@ -77,22 +76,17 @@ apt install rpi-connect -y
 # 11. Configurar Mosquitto (copiando archivo)
 echo "--- 8. Configurando Mosquitto ---"
 sudo mkdir -p /etc/mosquitto/conf.d
-# Copia el archivo de conf desde el repositorio
 sudo cp "$SCRIPT_DIR/RPI/mosquitto_winefridge.conf" /etc/mosquitto/conf.d/winefridge.conf
 echo "Archivo de configuración de Mosquitto copiado."
-
-echo "Reiniciando y activando servicio Mosquitto."
 sudo systemctl restart mosquitto
 sudo systemctl enable mosquitto
 
 # 12. Construir el Frontend
 echo "--- 9. Construyendo el Frontend (npm build) ---"
-# Ejecutamos como $TARGET_USER para permisos correctos de node_modules
 sudo -u $TARGET_USER bash -c "cd '$SCRIPT_DIR/RPI/frontend' && npm install && npm run build"
 
 # 13. Iniciar el Backend con PM2
 echo "--- 10. Iniciando el Backend con PM2 ---"
-# [CORRECCIÓN] Cambiado 'RPI/backend' a 'RPI'
 sudo -u $TARGET_USER bash -c "cd '$SCRIPT_DIR/RPI' && pm2 start pm2.config.js"
 
 # 14. Guardar la lista de procesos de PM2
@@ -101,10 +95,44 @@ sudo -u $TARGET_USER pm2 save
 
 # 15. Automatizar PM2 startup
 echo "--- 12. Automatizando PM2 startup al arranque ---"
-# Ejecuta 'pm2 startup' como el usuario, captura el comando de salida y lo ejecuta
 STARTUP_CMD=$(sudo -u $TARGET_USER pm2 startup | tail -n 1)
 eval $STARTUP_CMD
 echo "Servicio de arranque de PM2 creado."
+
+# 16. Configurar Arduino-CLI y permisos de serie
+echo "--- 13. Configurando Arduino-CLI y permisos ---"
+
+# Añadir usuario al grupo 'dialout' para permisos de puerto serie (Arduino/ESP32)
+usermod -aG dialout $TARGET_USER
+echo "Usuario '$TARGET_USER' añadido al grupo 'dialout'."
+
+# Instalar arduino-cli (el binario)
+curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sudo sh
+echo "arduino-cli instalado."
+
+# Las siguientes configuraciones (placas, librerías) deben hacerse COMO EL USUARIO
+echo "Configurando arduino-cli para el usuario '$TARGET_USER'..."
+sudo -u $TARGET_USER bash -c "
+  # 1. Inicializar la configuración
+  arduino-cli config init
+  
+  # 2. Añadir la URL de las placas ESP32
+  arduino-cli config set board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+  
+  # 3. Actualizar el índice e instalar el core de ESP32
+  arduino-cli core update-index
+  arduino-cli core install esp32:esp32
+  
+  # 4. Instalar las librerías necesarias
+  echo 'Instalando librerías de Arduino...'
+  arduino-cli lib install \"PubSubClient\"
+  arduino-cli lib install \"Adafruit NeoPixel\"
+  arduino-cli lib install \"ArduinoJson\"
+  arduino-cli lib install \"HX711-ADC\"
+  arduino-cli lib install \"Adafruit SHT31\"
+  # Nota: WiFi, Wire, ArduinoOTA, etc, ya vienen con el core de ESP32
+"
+echo "Configuración de arduino-cli completada."
 
 
 echo ""
@@ -114,9 +142,8 @@ echo "=========================================================="
 echo "PASOS SIGUIENTES (MANUALES):"
 echo "1. Para activar el acceso remoto, ejecuta este comando:"
 echo "   rpi-connect signin"
-echo "   (Sigue las instrucciones para loguearte en tu navegador)."
 echo ""
-echo "2. Reinicia la Pi para que todos los cambios de hardware"
-echo "   (USB, SPI, etc) y el servicio PM2 surtan efecto:"
+echo "2. REINICIA la Pi para que los cambios de grupo ('dialout')"
+echo "   y hardware surtan efecto:"
 echo "   sudo reboot"
-echo "=========================================================="
+echo "================================D=========================="
