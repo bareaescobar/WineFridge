@@ -1,5 +1,5 @@
 /*
- * WineFridge Drawer ESP32_DRAWER - SIMPLIFIED v3.0.3
+ * WineFridge Drawer ESP32_DRAWER3 - SIMPLIFIED v3.0.4
  * SIMPLE WEIGHT SYSTEM: Tare after every change
  *
  * LOGIC:
@@ -7,8 +7,15 @@
  * 2. TARE immediately → Reset to 0
  * 3. Next bottle → Measure from 0 → No error accumulation
  *
- * Version: 3.0.3
- * Date: 28.10.2025 18:15h
+ * Version: 3.0.4
+ * Date: 30.10.2025 15:30h
+ *
+ * CHANGELOG v3.0.4:
+ * - Added expectedPosition tracking for LOAD operations
+ * - Wrong position detection WITHOUT weighing (immediate red LED)
+ * - Green blinking LED during weighing (changed from blue)
+ * - Fixed blink parameter reading from MQTT JSON
+ * - Friendly OTA hostname: "WineFridge-Drawer3"
  */
 
 #include <WiFi.h>
@@ -23,7 +30,7 @@
 
 // ==================== CONFIGURATION ====================
 #define DRAWER_ID "drawer_3"
-#define FIRMWARE_VERSION "3.0.3"
+#define FIRMWARE_VERSION "3.0.4"
 
 // Network
 #define WIFI_SSID "MOVISTAR-WIFI6-65F8"
@@ -737,7 +744,7 @@ void handleCommand(JsonDocument& doc) {
       uint8_t position = pos["position"];
       String colorStr = pos["color"];
       uint8_t brightness = pos["brightness"];
-      bool blink = pos["blink"] | false;  // Read blink field, default to false if not present
+      bool blink = pos.containsKey("blink") ? pos["blink"].as<bool>() : false;  // Read blink field, default to false if not present
 
       if (position >= 1 && position <= 9) {
         uint32_t color = strtol(colorStr.c_str() + 1, NULL, 16);
