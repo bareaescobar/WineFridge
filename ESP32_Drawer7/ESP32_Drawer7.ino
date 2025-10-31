@@ -1,5 +1,5 @@
 /*
- * WineFridge Drawer ESP32_DRAWER7 - SIMPLIFIED v3.0.4
+ * WineFridge Drawer ESP32_DRAWER7 - SIMPLIFIED v3.0.5
  * SIMPLE WEIGHT SYSTEM: Tare after every change
  *
  * LOGIC:
@@ -7,8 +7,14 @@
  * 2. TARE immediately → Reset to 0
  * 3. Next bottle → Measure from 0 → No error accumulation
  *
- * Version: 3.0.4
- * Date: 30.10.2025 15:30h
+ * Version: 3.0.5
+ * Date: 31.10.2025 18:00h
+ *
+ * CHANGELOG v3.0.5:
+ * - CRITICAL: Fixed expectedPosition not clearing after wrong placement
+ * - CRITICAL: Fixed OTA watchdog interference (use esp_task_wdt_deinit)
+ * - Improved OTA stability with proper watchdog reinitialization on error
+ * - All subsequent placements now work correctly after wrong placement
  *
  * CHANGELOG v3.0.4:
  * - Added expectedPosition tracking for LOAD operations
@@ -30,7 +36,7 @@
 
 // ==================== CONFIGURATION ====================
 #define DRAWER_ID "drawer_7"
-#define FIRMWARE_VERSION "3.0.4"
+#define FIRMWARE_VERSION "3.0.5"
 
 // Network
 #define WIFI_SSID "MOVISTAR-WIFI6-65F8"
@@ -323,36 +329,43 @@ void setupOTA() {
   ArduinoOTA.setHostname("WineFridge-Drawer7");  // Friendly name for OTA discovery
   ArduinoOTA.setPassword("winefridge2025");
   ArduinoOTA.setPort(3232);
-  
+
   ArduinoOTA.onStart([]() {
     otaInProgress = true;
     Serial.println("\n[OTA] Update starting...");
-    
-    esp_task_wdt_delete(NULL);
-    
+
+    // CRITICAL: Delete watchdog BEFORE OTA to prevent interruptions
+    esp_task_wdt_deinit();  // Completely deinitialize watchdog
+    delay(100);  // Give time for watchdog to fully stop
+
     if (mqttClient.connected()) {
       mqttClient.disconnect();
     }
-    
+
     strip.clear();
     strip.show();
     ledcWrite(COB_WARM_PIN, 0);
     ledcWrite(COB_COOL_PIN, 0);
   });
-  
+
   ArduinoOTA.onEnd([]() {
     Serial.println("\n[OTA] Update complete!");
+    delay(500);
   });
-  
+
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
     static unsigned long lastPrint = 0;
+    unsigned int percent = (progress / (total / 100));
+
     if (millis() - lastPrint > 500) {
-      Serial.printf("[OTA] Progress: %u%%\n", (progress / (total / 100)));
+      Serial.printf("[OTA] Progress: %u%%\n", percent);
       lastPrint = millis();
-      yield();
     }
+
+    // Critical: yield more frequently during OTA to prevent blocking
+    yield();
   });
-  
+
   ArduinoOTA.onError([](ota_error_t error) {
     Serial.printf("\n[OTA] Error[%u]: ", error);
     if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
@@ -360,11 +373,20 @@ void setupOTA() {
     else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
     else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
     else if (error == OTA_END_ERROR) Serial.println("End Failed");
-    
+
     otaInProgress = false;
+
+    // Reinitialize watchdog after OTA error
+    esp_task_wdt_config_t wdt_config = {
+      .timeout_ms = WATCHDOG_TIMEOUT * 1000,
+      .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
+      .trigger_panic = true
+    };
+    esp_task_wdt_init(&wdt_config);
     esp_task_wdt_add(NULL);
+    Serial.println("[WATCHDOG] Reinitialized after OTA error");
   });
-  
+
   ArduinoOTA.begin();
   Serial.println("[OK] OTA enabled on port 3232");
 }
@@ -492,6 +514,10 @@ void updatePositionStateMachine(uint8_t posIndex) {
             char wrongPayload[256];
             serializeJson(wrongDoc, wrongPayload);
             eventQueue.push(mqtt_topic_status, wrongPayload);
+
+            // CRITICAL FIX: Clear expected position after wrong placement
+            // Otherwise ALL subsequent placements will be marked as wrong!
+            state.expectedPosition = 0;
           } else {
             // Correct position or no expected position - proceed with weighing
             pos->state = STATE_WEIGHING;

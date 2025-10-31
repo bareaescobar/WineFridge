@@ -380,7 +380,7 @@ class WineFridgeController:
         # Start timeout timer and store it so we can cancel/reset it
         timer = threading.Timer(60, self.handle_timeout, [op_id])
         timer.start()
-        op['timer'] = timer
+        self.pending_operations[op_id]['timer'] = timer
 
     def start_bottle_unload(self, data):
         barcode = data.get('barcode')
