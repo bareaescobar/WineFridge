@@ -23,7 +23,7 @@
 
 // ==================== CONFIGURATION ====================
 #define DRAWER_ID "drawer_7"
-#define FIRMWARE_VERSION "3.0.3"
+#define FIRMWARE_VERSION "3.0.3-B"
 
 // Network
 #define WIFI_SSID "MOVISTAR-WIFI6-65F8"
