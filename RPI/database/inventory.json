@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "name": "Lounge Fridge",
-  "last_updated": "2025-10-24T13:09:49.586439",
+  "last_updated": "2025-11-05T15:53:47.718439",
   "total_bottles": 29,
   "drawers": {
     "drawer_1": {
@@ -346,19 +346,21 @@
         },
         "7": {
           "occupied": true,
-          "barcode": "8410337311038",
-          "name": "Vi\u00f1a Cumbrero Crianza",
-          "weight": 1120,
-          "placed_date": "2025-06-15T12:00:00Z",
-          "aging_days": 2
-        },
-        "8": {
-          "occupied": true,
           "barcode": "8420906059308",
           "name": "Montesierra Young Red Wine",
           "weight": 1150,
-          "placed_date": "2025-06-14T15:45:00Z",
-          "aging_days": 3
+          "fill_percentage": 100,
+          "placed_date": "2025-11-05T15:53:47.718429",
+          "aging_days": 0
+        },
+        "8": {
+          "occupied": true,
+          "barcode": "8410337311038",
+          "name": "Vi\u00f1a Cumbrero Crianza",
+          "weight": 1120,
+          "fill_percentage": 100,
+          "placed_date": "2025-11-05T15:53:39.767035",
+          "aging_days": 0
         },
         "9": {
           "occupied": false
