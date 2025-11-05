@@ -1,8 +1,8 @@
 /*
- * WineFridge Lighting ESP32 - LIGHTING_2 Controller
+ * WineFridge Lighting ESP32 - LIGHTING_6 Controller v5.1.0
  * Located physically in drawer 2
- * Controls: Drawer 4, Drawer 5, Zone 2
- * Version 2.6 - With OTA Support
+ * Controls: Drawer 4, Drawer 6, Zone 2 (middle)
+ * Fixed WiFi timeout and GPIO2 immediate configuration
  */
 
 #include <WiFi.h>
@@ -10,20 +10,26 @@
 #include <FastLED.h>
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
+#include <ESPmDNS.h>
 #include "esp_task_wdt.h"
 
 // ==================== CONFIGURATION ====================
-#define LIGHTING_ID "lighting_6"      // Controller ID (physical location: drawer 2)
-#define FIRMWARE_VERSION "2.6.0"
+#define LIGHTING_ID "lighting_6"
+#define FIRMWARE_VERSION "5.1.0"
 
 // This controller manages:
-#define FIRST_DRAWER 4          // Drawer 2
-#define SECOND_DRAWER 6         // Drawer 1  
-#define ZONE_NUMBER 2           // Zone 1 (upper zone)
+#define FIRST_DRAWER 4
+#define SECOND_DRAWER 6
+#define ZONE_NUMBER 2  // Zone 2 (middle zone)
 
-// Network
-#define WIFI_SSID "MOVISTAR-WIFI6-65F8"
-#define WIFI_PASSWORD "sA77n4kXrss9k9fn377i"
+// Dual WiFi Configuration - Reduced timeout
+#define WIFI_SSID_1 "Winefridge"
+#define WIFI_PASSWORD_1 "aabbccdd"
+
+#define WIFI_SSID_2 "MOVISTAR-WIFI6-65F8"
+#define WIFI_PASSWORD_2 "sA77n4kXrss9k9fn377i"
+
+// MQTT Configuration
 #define MQTT_BROKER_IP "192.168.1.84"
 #define MQTT_PORT 1883
 
@@ -32,17 +38,17 @@
 #define CONNECTION_CHECK_INTERVAL 10000
 #define WATCHDOG_TIMEOUT 30
 
-// Hardware - CORRECT PINS (matching original working code)
-#define DRAWER1_LED_PIN    18      // WS2812B strip drawer 2
-#define DRAWER2_LED_PIN    12      // WS2812B strip drawer 1
-#define LEDS_PER_DRAWER    17      // 17 LEDs per drawer
+// Hardware - CORRECT PINS
+#define DRAWER1_LED_PIN    18
+#define DRAWER2_LED_PIN    12
+#define LEDS_PER_DRAWER    17
 
-#define DRAWER1_WARM_PIN   19      // COB warm for drawer 2
-#define DRAWER1_COOL_PIN   21      // COB cool for drawer 2
-#define DRAWER2_WARM_PIN   32      // COB warm for drawer 1
-#define DRAWER2_COOL_PIN   33      // COB cool for drawer 1
-#define ZONE_WARM_PIN      14      // Zone 1 warm
-#define ZONE_COOL_PIN      13      // Zone 1 cool
+#define DRAWER1_WARM_PIN   19
+#define DRAWER1_COOL_PIN   21
+#define DRAWER2_WARM_PIN   32
+#define DRAWER2_COOL_PIN   33
+#define ZONE_WARM_PIN      14
+#define ZONE_COOL_PIN      13
 
 // Constants
 #define MAX_BRIGHTNESS 150
@@ -65,14 +71,14 @@ struct {
     uint16_t temperature = 4000;
     uint8_t brightness = 0;
     bool leds_active = false;
-    uint8_t frontBrightness = 100;  // Front LED brightness 0-100
+    uint8_t frontBrightness = 100;
   } drawer1;
   
   struct {
     uint16_t temperature = 4000;
     uint8_t brightness = 0;
     bool leds_active = false;
-    uint8_t frontBrightness = 100;  // Front LED brightness 0-100
+    uint8_t frontBrightness = 100;
   } drawer2;
   
   struct {
@@ -82,35 +88,40 @@ struct {
   
   bool lightingReady = false;
   bool debugMode = false;
+  String ipAddress = "0.0.0.0";
+  String connectedSSID = "";
 } state;
 
 char mqtt_topic_status[64];
 char mqtt_topic_command[64];
 
-// ==================== FUNCTION PROTOTYPES ====================
-void setupNetwork();
-void connectMQTT();
-void setupOTA();
-void maintainConnections();
-void setDrawerLEDs(uint8_t drawer, JsonArray positions);
-void setAllDrawerLEDs(uint8_t drawer, String colorStr, uint8_t brightness);
-void setCOBLighting(uint8_t warmPin, uint8_t coolPin, uint16_t temperature, uint8_t brightness);
-void setDrawerGeneral(uint8_t drawer, uint16_t temperature, uint8_t brightness);
-void setZoneLight(uint8_t zone, uint16_t temperature, uint8_t brightness);
-void allLightsOff();
-void onMQTTMessage(char* topic, byte* payload, unsigned int length);
-void handleCommand(JsonDocument& doc);
-void sendHeartbeat();
-void sendStartupMessage();
-
-
 // ==================== SETUP ====================
 void setup() {
+  // Configure all GPIO immediately (especially BOOT pins)
+  pinMode(ZONE_WARM_PIN, OUTPUT);
+  digitalWrite(ZONE_WARM_PIN, LOW);
+  pinMode(ZONE_COOL_PIN, OUTPUT);
+  digitalWrite(ZONE_COOL_PIN, LOW);
+  pinMode(DRAWER1_WARM_PIN, OUTPUT);
+  digitalWrite(DRAWER1_WARM_PIN, LOW);
+  pinMode(DRAWER1_COOL_PIN, OUTPUT);
+  digitalWrite(DRAWER1_COOL_PIN, LOW);
+  pinMode(DRAWER2_WARM_PIN, OUTPUT);
+  digitalWrite(DRAWER2_WARM_PIN, LOW);
+  pinMode(DRAWER2_COOL_PIN, OUTPUT);
+  digitalWrite(DRAWER2_COOL_PIN, LOW);
+  delay(100);
+  
   Serial.begin(115200);
   delay(500);
-  Serial.println("\n[STARTUP] WineFridge Lighting - " + String(LIGHTING_ID));
-  Serial.println("[VERSION] Firmware: " + String(FIRMWARE_VERSION));
-  Serial.printf("[CONFIG] Drawers: %d,%d | Zone: %d\n", FIRST_DRAWER, SECOND_DRAWER, ZONE_NUMBER);
+  Serial.println("\n========================================");
+  Serial.println("WineFridge Lighting - " + String(LIGHTING_ID));
+  Serial.println("Firmware: v" + String(FIRMWARE_VERSION));
+  Serial.println("========================================");
+  Serial.printf("Configuration:\n");
+  Serial.printf("  Drawers: %d, %d\n", FIRST_DRAWER, SECOND_DRAWER);
+  Serial.printf("  Zone: %d (upper)\n", ZONE_NUMBER);
+  Serial.println();
 
   // Watchdog
   esp_task_wdt_config_t wdt_config = {
@@ -120,13 +131,6 @@ void setup() {
   };
   esp_task_wdt_init(&wdt_config);
   esp_task_wdt_add(NULL);
-
-  // Configure BOOT pins immediately
-  pinMode(ZONE_WARM_PIN, OUTPUT);
-  digitalWrite(ZONE_WARM_PIN, LOW);
-  pinMode(ZONE_COOL_PIN, OUTPUT); 
-  digitalWrite(ZONE_COOL_PIN, LOW);
-  delay(100);
   
   snprintf(mqtt_topic_status, sizeof(mqtt_topic_status), "winefridge/%s/status", LIGHTING_ID);
   snprintf(mqtt_topic_command, sizeof(mqtt_topic_command), "winefridge/%s/command", LIGHTING_ID);
@@ -137,8 +141,9 @@ void setup() {
   FastLED.setBrightness(MAX_BRIGHTNESS);
   FastLED.clear();
   FastLED.show();
+  Serial.println("[OK] WS2812B LED strips");
   
-  // COB LEDs
+  // COB LEDs - Already configured, now setup PWM
   ledcAttach(DRAWER1_WARM_PIN, COB_PWM_FREQUENCY, COB_PWM_RESOLUTION);
   ledcAttach(DRAWER1_COOL_PIN, COB_PWM_FREQUENCY, COB_PWM_RESOLUTION);
   ledcAttach(DRAWER2_WARM_PIN, COB_PWM_FREQUENCY, COB_PWM_RESOLUTION);
@@ -152,42 +157,86 @@ void setup() {
   ledcWrite(DRAWER2_COOL_PIN, 0);
   ledcWrite(ZONE_WARM_PIN, 0);
   ledcWrite(ZONE_COOL_PIN, 0);
+  Serial.println("[OK] COB LEDs");
   
   state.lightingReady = true;
-  Serial.println("[OK] Lighting hardware");
   
   setupNetwork();
-  setupOTA();
   
-  Serial.println("[READY] System initialized");
+  // OTA - only if WiFi connected
+  if (WiFi.status() == WL_CONNECTED) {
+    setupOTA();
+  }
+  
+  Serial.println("\n[READY] System initialized\n");
   esp_task_wdt_reset();
 }
 
 // ==================== NETWORK ====================
 void setupNetwork() {
+  Serial.println("\n[WIFI] Starting connection...");
+  
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   
-  Serial.print("[WIFI] Connecting");
+  // Try primary WiFi (10 seconds max)
+  WiFi.begin(WIFI_SSID_1, WIFI_PASSWORD_1);
+  Serial.print("[WIFI] Trying ");
+  Serial.print(WIFI_SSID_1);
+  Serial.print("...");
+  
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
     delay(500);
     Serial.print(".");
     attempts++;
     esp_task_wdt_reset();
   }
   
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[OK] WiFi connected: " + WiFi.localIP().toString());
+  // If primary fails, RESET WiFi completely before trying secondary
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println(" failed");
     
+    // CRITICAL: Complete WiFi reset between attempts
+    Serial.println("[WIFI] Resetting WiFi module...");
+    WiFi.disconnect(true);      // Disconnect + clear config
+    delay(1000);                 // Wait for cleanup
+    WiFi.mode(WIFI_OFF);        // Turn off WiFi
+    delay(500);                  
+    WiFi.mode(WIFI_STA);        // Re-enable Station mode
+    delay(500);
+    
+    Serial.print("[WIFI] Trying ");
+    Serial.print(WIFI_SSID_2);
+    Serial.print("...");
+    
+    WiFi.begin(WIFI_SSID_2, WIFI_PASSWORD_2);
+    attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+      delay(500);
+      Serial.print(".");
+      attempts++;
+      esp_task_wdt_reset();
+    }
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    state.ipAddress = WiFi.localIP().toString();
+    state.connectedSSID = WiFi.SSID();
+    Serial.println(" ✓");
+    Serial.println("[WIFI] IP: " + state.ipAddress);
+    Serial.println("[WIFI] SSID: " + state.connectedSSID);
+    
+    // Setup MQTT
     mqttClient.setServer(MQTT_BROKER_IP, MQTT_PORT);
     mqttClient.setCallback(onMQTTMessage);
     mqttClient.setBufferSize(2048);
     
     connectMQTT();
   } else {
-    Serial.println("\n[ERROR] WiFi connection failed");
+    Serial.println(" ✗");
+    Serial.println("[WIFI] Connection failed - will retry in loop");
+    state.ipAddress = "0.0.0.0";
   }
 }
 
@@ -196,25 +245,34 @@ void connectMQTT() {
   
   String clientId = String(LIGHTING_ID) + "-" + String(random(0xffff), HEX);
   
+  Serial.print("[MQTT] Connecting...");
   if (mqttClient.connect(clientId.c_str())) {
-    Serial.println("[OK] MQTT connected");
+    Serial.println(" ✓");
     mqttClient.subscribe(mqtt_topic_command);
     sendStartupMessage();
   } else {
-    Serial.println("[ERROR] MQTT connection failed: " + String(mqttClient.state()));
+    Serial.print(" ✗ (");
+    Serial.print(mqttClient.state());
+    Serial.println(")");
   }
 }
 
 // ==================== OTA SETUP ====================
 void setupOTA() {
-  ArduinoOTA.setHostname(LIGHTING_ID);
+  ArduinoOTA.setPort(3232);
   ArduinoOTA.setPassword("winefridge2025");
   
   ArduinoOTA.onStart([]() {
     otaInProgress = true;
-    Serial.println("\n[OTA] Update starting...");
-    esp_task_wdt_delete(NULL);
+    Serial.println("\n[OTA] Starting update...");
+    
+    // Disable watchdog
+    esp_task_wdt_deinit();
+    
+    // Disconnect MQTT
     if (mqttClient.connected()) mqttClient.disconnect();
+    
+    // Turn off all lights
     allLightsOff();
   });
   
@@ -223,17 +281,27 @@ void setupOTA() {
   });
   
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("[OTA] Progress: %u%%\r", (progress / (total / 100)));
+    static unsigned long lastReport = 0;
+    if (millis() - lastReport > 500) {
+      Serial.printf("[OTA] Progress: %u%%\r", (progress / (total / 100)));
+      lastReport = millis();
+    }
   });
   
   ArduinoOTA.onError([](ota_error_t error) {
     Serial.printf("\n[OTA] Error[%u]: ", error);
-    otaInProgress = false;
-    esp_task_wdt_add(NULL);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    
+    delay(1000);
+    ESP.restart();
   });
   
   ArduinoOTA.begin();
-  Serial.println("[OK] OTA enabled");
+  Serial.println("[OK] OTA ready (IP: " + state.ipAddress + ")");
 }
 
 // ==================== MAIN LOOP ====================
@@ -266,14 +334,21 @@ void loop() {
 }
 
 void maintainConnections() {
+  // WiFi check
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[ERROR] WiFi lost, reconnecting");
-    WiFi.reconnect();
+    Serial.println("[WIFI] Lost, reconnecting...");
+    setupNetwork();
+    
+    // Setup OTA if reconnected
+    if (WiFi.status() == WL_CONNECTED && !otaInProgress) {
+      setupOTA();
+    }
     return;
   }
   
+  // MQTT check
   if (!mqttClient.connected()) {
-    Serial.println("[ERROR] MQTT lost, reconnecting");
+    Serial.println("[MQTT] Lost, reconnecting...");
     connectMQTT();
   }
 }
@@ -306,13 +381,12 @@ void setDrawerLEDs(uint8_t drawer, JsonArray positions) {
   for (JsonObject pos : positions) {
     uint8_t position = pos["position"];
     String colorStr = pos["color"];
-    uint8_t brightness = 255;  // Default max brightness
+    uint8_t brightness = 255;
     
-    // Check for brightness parameter (0-100 scale)
     if (pos.containsKey("brightness")) {
       uint8_t b = pos["brightness"];
-      brightness = map(b, 0, 100, 0, 255);  // Convert 0-100 to 0-255
-      *front_brightness = b;  // Store for status
+      brightness = map(b, 0, 100, 0, 255);
+      *front_brightness = b;
     }
     
     if (position >= 1 && position <= LEDS_PER_DRAWER) {
@@ -351,17 +425,14 @@ void setAllDrawerLEDs(uint8_t drawer, String colorStr, uint8_t brightness) {
     return;
   }
   
-  // Convert brightness from 0-100 to 0-255
   uint8_t scaled_brightness = map(brightness, 0, 100, 0, 255);
   *front_brightness = brightness;
   
-  // Parse color
   uint32_t color = strtol(colorStr.c_str() + 1, NULL, 16);
   uint8_t r = ((color >> 16) & 0xFF) * scaled_brightness / 255;
   uint8_t g = ((color >> 8) & 0xFF) * scaled_brightness / 255;
   uint8_t b = (color & 0xFF) * scaled_brightness / 255;
   
-  // Set all LEDs to same color
   for (int i = 0; i < LEDS_PER_DRAWER; i++) {
     led_array[i] = CRGB(r, g, b);
   }
@@ -468,7 +539,6 @@ void handleCommand(JsonDocument& doc) {
     Serial.println("[CMD] Set LEDs drawer " + String(drawer));
   }
   else if (action == "set_all_leds") {
-    // Control all 17 LEDs at once
     uint8_t drawer = data["drawer"];
     String color = data["color"];
     uint8_t brightness = data.containsKey("brightness") ? data["brightness"] : 100;
@@ -512,10 +582,11 @@ void sendHeartbeat() {
   StaticJsonDocument<512> doc;
   doc["action"] = "heartbeat";
   doc["source"] = LIGHTING_ID;
+  doc["firmware"] = FIRMWARE_VERSION;
+  doc["ip"] = state.ipAddress;
   
   JsonObject data = doc.createNestedObject("data");
   
-  // Drawer 1 (physical drawer 2)
   JsonObject d1 = data.createNestedObject("d1");
   d1["id"] = FIRST_DRAWER;
   String light1 = String(state.drawer1.temperature) + "K " + String(state.drawer1.brightness) + "%";
@@ -523,7 +594,6 @@ void sendHeartbeat() {
   d1["leds"] = state.drawer1.leds_active ? 1 : 0;
   d1["front_brightness"] = state.drawer1.frontBrightness;
   
-  // Drawer 2 (physical drawer 1)
   JsonObject d2 = data.createNestedObject("d2");
   d2["id"] = SECOND_DRAWER;
   String light2 = String(state.drawer2.temperature) + "K " + String(state.drawer2.brightness) + "%";
@@ -531,14 +601,13 @@ void sendHeartbeat() {
   d2["leds"] = state.drawer2.leds_active ? 1 : 0;
   d2["front_brightness"] = state.drawer2.frontBrightness;
   
-  // Zone
   JsonObject zone = data.createNestedObject("zone");
   zone["id"] = ZONE_NUMBER;
   String lightZone = String(state.zone.temperature) + "K " + String(state.zone.brightness) + "%";
   zone["light"] = lightZone;
   
-  data["wifi"] = WiFi.RSSI();
-  data["firmware"] = FIRMWARE_VERSION;
+  data["wifi_rssi"] = WiFi.RSSI();
+  data["ssid"] = state.connectedSSID;
   
   String output;
   serializeJson(doc, output);
@@ -560,11 +629,12 @@ void sendStartupMessage() {
   data["drawers"][0] = FIRST_DRAWER;
   data["drawers"][1] = SECOND_DRAWER;
   data["zone"] = ZONE_NUMBER;
-  data["ip"] = WiFi.localIP().toString();
+  data["ip"] = state.ipAddress;
+  data["ssid"] = state.connectedSSID;
   
   String output;
   serializeJson(doc, output);
   
   mqttClient.publish(mqtt_topic_status, output.c_str());
-  Serial.println("[MQTT] Startup sent");
+  Serial.println("[MQTT] Startup message sent");
 }
