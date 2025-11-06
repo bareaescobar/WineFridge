@@ -1,8 +1,8 @@
 {
   "version": "1.0",
   "name": "Lounge Fridge",
-  "last_updated": "2025-11-05T15:53:47.718439",
-  "total_bottles": 29,
+  "last_updated": "2025-11-06T13:44:34.687347",
+  "total_bottles": 31,
   "drawers": {
     "drawer_1": {
       "zone": "Lower",
@@ -327,16 +327,34 @@
       "mode": "red",
       "positions": {
         "1": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8410310606168",
+          "name": "Hoya de Cadenas Cabernet Sauvignon Crianza",
+          "weight": 923.5,
+          "fill_percentage": 100,
+          "placed_date": "2025-11-06T13:44:27.448544",
+          "aging_days": 0
         },
         "2": {
           "occupied": false
         },
         "3": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8420906059308",
+          "name": "Montesierra Young Red Wine",
+          "weight": 1150,
+          "fill_percentage": 100,
+          "placed_date": "2025-11-06T13:40:50.052978",
+          "aging_days": 0
         },
         "4": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8410261111025",
+          "name": "Pata Negra Crianza",
+          "weight": 880.1,
+          "fill_percentage": 100,
+          "placed_date": "2025-11-06T13:44:34.687339",
+          "aging_days": 0
         },
         "5": {
           "occupied": false
@@ -346,21 +364,15 @@
         },
         "7": {
           "occupied": true,
-          "barcode": "8420906059308",
-          "name": "Montesierra Young Red Wine",
-          "weight": 1150,
+          "barcode": "8420209033869",
+          "name": "Silanus Young Red",
+          "weight": 3458,
           "fill_percentage": 100,
-          "placed_date": "2025-11-05T15:53:47.718429",
+          "placed_date": "2025-11-06T13:40:38.413072",
           "aging_days": 0
         },
         "8": {
-          "occupied": true,
-          "barcode": "8410337311038",
-          "name": "Vi\u00f1a Cumbrero Crianza",
-          "weight": 1120,
-          "fill_percentage": 100,
-          "placed_date": "2025-11-05T15:53:39.767035",
-          "aging_days": 0
+          "occupied": false
         },
         "9": {
           "occupied": false
