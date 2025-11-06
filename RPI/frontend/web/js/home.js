@@ -112,19 +112,25 @@ const modalActions = {
     const form = btn.closest('.form')
     const key = form.dataset.key
     const formData = getZoneLightning(form)
-    const data = {
-      action: 'set_brightness',
+
+    // Build the core command data
+    const commandData = {
+      action: 'set_brightness', // <-- Top-level action
       zone: key,
       value: formData.brightness,
       color_temp: formData.colorType,
     }
+
+    // Create a flat payload by spreading the command data
     const payload = {
       timestamp: new Date().toISOString(),
       source: 'web_client',
       target: 'rpi_server',
       message_type: 'command',
-      data,
+      ...commandData // <-- Use spread operator to merge all keys to top level
     }
+
+    // The resulting JSON will now have 'action' at the top level
     const message = JSON.stringify(payload)
     publish(TOPICS.WEB_TO_RPI_COMMAND, message)
   },
