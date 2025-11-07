@@ -1,8 +1,10 @@
 /*
- * WineFridge Drawer ESP32_DRAWER7 v5.5.0
+ * WineFridge Drawer ESP32_DRAWER7 v5.7.0
  * 
- * CHANGELOG v5.5.0:
- * NEW VARIABLE 
+ * BASED ON WORKING v33 PATTERN
+ * - NO OTA (conflicts with GPIO 2)
+ * - COB lights fully working
+ * - Uses pinMode + ledcDetach + ledcAttach pattern
  */
 
 #include <WiFi.h>
@@ -11,12 +13,10 @@
 #include <ArduinoJson.h>
 #include <HX711.h>
 #include <Wire.h>
-#include <ArduinoOTA.h>
 #include "Adafruit_SHT31.h"
-#include "esp_task_wdt.h"
 
 #define DRAWER_ID "drawer_7"
-#define FIRMWARE_VERSION "5.5.0"
+#define FIRMWARE_VERSION "5.7.0"
 
 // WiFi
 #define WIFI_SSID_1 "Solo Spirits"
@@ -29,9 +29,7 @@
 
 #define HEARTBEAT_INTERVAL 60000
 #define DEBOUNCE_TIME 50
-#define WEIGHT_STABILIZE_TIME 2000  // 2 seconds total for weighing
-#define WATCHDOG_TIMEOUT 75000 // 75 seconds
-#define NETWORK_TIMECHECK 30000 // 30 seconds
+#define WEIGHT_STABILIZE_TIME 2000
 
 // Hardware
 const uint8_t SWITCH_PINS[9] = {5, 32, 26, 14, 4, 23, 33, 27, 12};
@@ -47,12 +45,12 @@ const uint8_t bottleToLed[9] = {2, 6, 10, 14, 0, 4, 8, 12, 16};
 // Weight
 #define WEIGHT_CALIBRATION_FACTOR 94.302184
 #define WEIGHT_THRESHOLD 100.0
-#define WEIGHT_FALLBACK 1000.0  // Use 1000g if sensor fails
-#define NUM_WEIGHT_READINGS 5   // Take 5 readings
-#define WEIGHT_OUTLIER_THRESHOLD 200.0  // Discard readings >200g from median
+#define NUM_WEIGHT_READINGS 5
+#define WEIGHT_OUTLIER_THRESHOLD 200.0
 
 #define COB_PWM_FREQUENCY 5000
 #define COB_PWM_RESOLUTION 8
+#define PWM_MAX 255
 #define TEMP_MIN 2700
 #define TEMP_MAX 6500
 #define BLINK_INTERVAL 500
@@ -92,7 +90,6 @@ struct {
   bool tempSensorReady = false;
   uint8_t expectedPosition = 0;
   String ipAddress = "0.0.0.0";
-  String connectedSSID = "";
 } state;
 
 // ==================== GLOBALS ====================
@@ -104,33 +101,18 @@ Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
 BottlePosition positions[9];
 LEDBlinkState ledBlinkStates[9];
-volatile bool otaInProgress = false;
 
 char mqtt_topic_status[64];
 char mqtt_topic_command[64];
 
 // ==================== SETUP ====================
 void setup() {
-  pinMode(COB_WARM_PIN, OUTPUT);
-  digitalWrite(COB_WARM_PIN, LOW);
-  pinMode(COB_COOL_PIN, OUTPUT);
-  digitalWrite(COB_COOL_PIN, LOW);
-  delay(100);
-  
   Serial.begin(115200);
   delay(500);
   Serial.println("\n========================================");
   Serial.println("WineFridge Drawer - " + String(DRAWER_ID));
   Serial.println("Firmware: v" + String(FIRMWARE_VERSION));
   Serial.println("========================================");
-
-  esp_task_wdt_config_t wdt_config = {
-    .timeout_ms = WATCHDOG_TIMEOUT,
-    .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
-    .trigger_panic = true
-  };
-  esp_task_wdt_init(&wdt_config);
-  esp_task_wdt_add(NULL);
   
   memset(&state, 0, sizeof(state));
   memset(&positions, 0, sizeof(positions));
@@ -144,7 +126,6 @@ void setup() {
   setupCOBLEDs();
   setupSensors();
   setupNetwork();
-  setupOTA();
   
   for (int i = 0; i < 9; i++) {
     positions[i].state = STATE_EMPTY;
@@ -152,7 +133,6 @@ void setup() {
   }
   
   Serial.println("\n[READY]\n");
-  esp_task_wdt_reset();
 }
 
 void setupPins() {
@@ -170,11 +150,41 @@ void setupLEDs() {
 }
 
 void setupCOBLEDs() {
+  Serial.println("[COB] Initializing COB LEDs...");
+  
+  // CRITICAL PATTERN for GPIO 2:
+  // 1. pinMode + digitalWrite LOW
+  pinMode(COB_WARM_PIN, OUTPUT);
+  pinMode(COB_COOL_PIN, OUTPUT);
+  digitalWrite(COB_WARM_PIN, LOW);
+  digitalWrite(COB_COOL_PIN, LOW);
+  
+  // 2. ledcDetach (clear any previous config)
+  ledcDetach(COB_WARM_PIN);
+  ledcDetach(COB_COOL_PIN);
+  delay(100);
+  
+  // 3. ledcAttach (setup PWM)
   ledcAttach(COB_WARM_PIN, COB_PWM_FREQUENCY, COB_PWM_RESOLUTION);
   ledcAttach(COB_COOL_PIN, COB_PWM_FREQUENCY, COB_PWM_RESOLUTION);
+  
+  // 4. Set to off
   ledcWrite(COB_WARM_PIN, 0);
   ledcWrite(COB_COOL_PIN, 0);
-  Serial.println("[OK] COB LEDs");
+  
+  Serial.println("[COB] Testing - turning ON for 1 second...");
+  
+  // Test: Turn on warm at 50%
+  ledcWrite(COB_WARM_PIN, 128);
+  delay(500);
+  ledcWrite(COB_WARM_PIN, 0);
+  
+  // Test: Turn on cool at 50%
+  ledcWrite(COB_COOL_PIN, 128);
+  delay(500);
+  ledcWrite(COB_COOL_PIN, 0);
+  
+  Serial.println("[OK] COB LEDs ready");
 }
 
 void setupSensors() {
@@ -186,10 +196,10 @@ void setupSensors() {
     delay(200);
     scale.tare();
     state.weightSensorReady = true;
-    Serial.println("[OK] HX711 ready & tared");
+    Serial.println("[OK] HX711 ready");
   } else {
     state.weightSensorReady = false;
-    Serial.println("[WARN] HX711 FAILED - will use fallback 1000g");
+    Serial.println("[WARN] HX711 FAILED");
   }
   
   Wire.begin(21, 22);
@@ -217,17 +227,12 @@ void setupNetwork() {
     delay(500);
     Serial.print(".");
     attempts++;
-    esp_task_wdt_reset();
   }
   
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println(" failed");
     WiFi.disconnect(true);
     delay(1000);
-    WiFi.mode(WIFI_OFF);
-    delay(500);
-    WiFi.mode(WIFI_STA);
-    delay(500);
     
     Serial.print("[WIFI] Trying ");
     Serial.print(WIFI_SSID_2);
@@ -239,13 +244,11 @@ void setupNetwork() {
       delay(500);
       Serial.print(".");
       attempts++;
-      esp_task_wdt_reset();
     }
   }
   
   if (WiFi.status() == WL_CONNECTED) {
     state.ipAddress = WiFi.localIP().toString();
-    state.connectedSSID = WiFi.SSID();
     Serial.println(" ✓");
     Serial.println("[WIFI] IP: " + state.ipAddress);
     
@@ -260,48 +263,6 @@ void setupNetwork() {
   }
 }
 
-void setupOTA() {
-  ArduinoOTA.setPort(3232);
-  ArduinoOTA.setPassword("winefridge2025");
-  
-  ArduinoOTA.onStart([]() {
-    otaInProgress = true;
-    Serial.println("\n[OTA] Starting...");
-    esp_task_wdt_deinit();
-    if (mqttClient.connected()) mqttClient.disconnect();
-    strip.clear();
-    strip.show();
-    ledcWrite(COB_WARM_PIN, 0);
-    ledcWrite(COB_COOL_PIN, 0);
-  });
-  
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\n[OTA] Complete!");
-  });
-  
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    static unsigned long lastReport = 0;
-    if (millis() - lastReport > 500) {
-      Serial.printf("[OTA] Progress: %u%%\r", (progress / (total / 100)));
-      lastReport = millis();
-    }
-  });
-  
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("\n[OTA] Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-    delay(1000);
-    ESP.restart();
-  });
-  
-  ArduinoOTA.begin();
-  Serial.println("[OK] OTA ready");
-}
-
 void connectMQTT() {
   if (WiFi.status() != WL_CONNECTED) return;
   
@@ -311,6 +272,7 @@ void connectMQTT() {
   if (mqttClient.connect(clientId.c_str())) {
     Serial.println(" ✓");
     mqttClient.subscribe(mqtt_topic_command);
+    Serial.println("[MQTT] Subscribed: " + String(mqtt_topic_command));
     sendStartupMessage();
   } else {
     Serial.print(" ✗ (");
@@ -319,17 +281,14 @@ void connectMQTT() {
   }
 }
 
-// ==================== LOOP ====================
+// ==================== MAIN LOOP ====================
 void loop() {
-  ArduinoOTA.handle();
-  esp_task_wdt_reset();
-  
-  if (otaInProgress) return;
+  yield();
   
   updateBlinkingLEDs();
   
   static unsigned long lastConnectionCheck = 0;
-  if (millis() - lastConnectionCheck > NETWORK_TIMECHECK) {
+  if (millis() - lastConnectionCheck > 30000) {
     maintainConnections();
     lastConnectionCheck = millis();
   }
@@ -358,153 +317,115 @@ void loop() {
 }
 
 // ==================== STATE MACHINE ====================
-void updatePositionStateMachine(uint8_t posIndex) {
-  BottlePosition* pos = &positions[posIndex];
-  bool switchPressed = (digitalRead(SWITCH_PINS[posIndex]) == LOW);
+void updatePositionStateMachine(uint8_t position) {
+  bool currentSwitch = (digitalRead(SWITCH_PINS[position]) == LOW);
+  BottlePosition* pos = &positions[position];
   
   switch (pos->state) {
-    
     case STATE_EMPTY:
-      if (switchPressed) {
+      if (currentSwitch) {
         pos->state = STATE_DEBOUNCING;
         pos->stateTimer = millis();
         pos->debounceCount = 1;
       }
       break;
-    
+      
     case STATE_DEBOUNCING:
-      if (millis() - pos->stateTimer > 10) {
-        if (switchPressed) {
-          pos->debounceCount++;
-        } else {
-          pos->state = STATE_EMPTY;
-          pos->debounceCount = 0;
-        }
-        
+      if (!currentSwitch) {
+        pos->state = STATE_EMPTY;
+        pos->debounceCount = 0;
+      } else if (millis() - pos->stateTimer > DEBOUNCE_TIME) {
+        pos->debounceCount++;
         pos->stateTimer = millis();
         
-        if (pos->debounceCount >= 5) {
-          // Check wrong position
-          if (state.expectedPosition != 0 && (posIndex + 1) != state.expectedPosition) {
-            Serial.printf("[ERROR] Wrong position! Expected %d, got %d\n", state.expectedPosition, posIndex + 1);
-            
-            pos->weight = WEIGHT_FALLBACK;
-            state.individualWeights[posIndex] = pos->weight;
-            pos->state = STATE_OCCUPIED;
-            
-            setLED(posIndex + 1, 0xFF0000, 100, false);  // RED solid
-            
-            sendWrongPlacement(posIndex + 1);
-          } else {
-            // Correct position - weigh
-            pos->state = STATE_WEIGHING;
-            pos->stateTimer = millis();
-            setLED(posIndex + 1, 0x00FF00, 100, true);  // GREEN blinking
+        if (pos->debounceCount >= 3) {
+          if (state.expectedPosition != 0 && (position + 1) != state.expectedPosition) {
+            Serial.printf("[WARN] Wrong position! Expected %d, got %d\n", 
+                         state.expectedPosition, position + 1);
+            sendWrongPlacement(position + 1);
+            setLED(position + 1, 0xFF0000, 100, true);
+            pos->state = STATE_EMPTY;
+            return;
           }
+          
+          pos->state = STATE_WEIGHING;
+          pos->stateTimer = millis();
+          setLED(position + 1, 0x00FF00, 50, true);
+          Serial.printf("[POS %d] Weighing...\n", position + 1);
         }
       }
       break;
-    
+      
     case STATE_WEIGHING:
-      if (millis() - pos->stateTimer > WEIGHT_STABILIZE_TIME) {
-        esp_task_wdt_reset();
+      if (!currentSwitch) {
+        pos->state = STATE_EMPTY;
+        setLED(position + 1, 0x000000, 0, false);
+      } else if (millis() - pos->stateTimer > WEIGHT_STABILIZE_TIME) {
+        float weight = getStableWeight();
         
-        float weight = readWeightRobust();
-        
-        if (weight >= WEIGHT_THRESHOLD) {
+        if (weight > WEIGHT_THRESHOLD) {
           pos->weight = weight;
-          Serial.printf("[WEIGHT] ✓ Pos %d: %.1fg\n", posIndex + 1, weight);
+          state.individualWeights[position] = weight;
+          state.positions[position] = true;
+          pos->state = STATE_OCCUPIED;
+          
+          setLED(position + 1, 0x808080, 30, false);
+          sendBottleEvent(position + 1, true, weight);
+          
+          Serial.printf("[POS %d] ✓ Placed: %.1fg\n", position + 1, weight);
+          
+          if (state.expectedPosition == (position + 1)) {
+            state.expectedPosition = 0;
+          }
         } else {
-          pos->weight = WEIGHT_FALLBACK;
-          Serial.printf("[WEIGHT] ⚠ Pos %d: Low (%.1fg), using %dg\n", posIndex + 1, weight, (int)WEIGHT_FALLBACK);
+          Serial.printf("[POS %d] ✗ Weight too low: %.1fg\n", position + 1, weight);
+          pos->state = STATE_EMPTY;
+          setLED(position + 1, 0xFF0000, 100, true);
+          delay(2000);
+          setLED(position + 1, 0x000000, 0, false);
         }
-        
-        state.individualWeights[posIndex] = pos->weight;
-        state.positions[posIndex] = true;
-        pos->state = STATE_OCCUPIED;
-        
-        if (state.expectedPosition == (posIndex + 1)) {
-          state.expectedPosition = 0;
-        }
-        
-        setLED(posIndex + 1, 0x444444, 50, false);  // GRAY solid
-        
-        Serial.printf("[EVENT] ✓ PLACED at %d (%.1fg)\n", posIndex + 1, pos->weight);
-        sendBottleEvent(posIndex + 1, true, pos->weight);
-        
-        // TARE immediately
-        yield();
-        if (state.weightSensorReady && scale.is_ready()) {
-          scale.tare();
-          Serial.println("[WEIGHT] ✓ Tared");
-        }
-        esp_task_wdt_reset();
       }
       break;
-    
+      
     case STATE_OCCUPIED:
-      if (!switchPressed) {
+      if (!currentSwitch) {
         pos->state = STATE_REMOVING;
         pos->stateTimer = millis();
-        pos->debounceCount = 1;
       }
       break;
-    
+      
     case STATE_REMOVING:
-      if (millis() - pos->stateTimer > 10) {
-        if (!switchPressed) {
-          pos->debounceCount++;
-        } else {
-          pos->state = STATE_OCCUPIED;
-          pos->debounceCount = 0;
-        }
+      if (currentSwitch) {
+        pos->state = STATE_OCCUPIED;
+      } else if (millis() - pos->stateTimer > DEBOUNCE_TIME * 3) {
+        float oldWeight = pos->weight;
+        pos->weight = 0.0;
+        state.individualWeights[position] = 0.0;
+        state.positions[position] = false;
+        pos->state = STATE_EMPTY;
         
-        pos->stateTimer = millis();
+        setLED(position + 1, 0x000000, 0, false);
+        sendBottleEvent(position + 1, false, oldWeight);
         
-        if (pos->debounceCount >= 5) {
-          esp_task_wdt_reset();
-          
-          float removedWeight = pos->weight;
-          pos->weight = 0.0;
-          state.individualWeights[posIndex] = 0.0;
-          state.positions[posIndex] = false;
-          pos->state = STATE_EMPTY;
-          
-          setLED(posIndex + 1, 0x000000, 0, false);  // OFF
-          
-          Serial.printf("[EVENT] ✓ REMOVED from %d (was %.1fg)\n", posIndex + 1, removedWeight);
-          sendBottleEvent(posIndex + 1, false, removedWeight);
-          
-          // TARE immediately
-          yield();
-          if (state.weightSensorReady && scale.is_ready()) {
-            scale.tare();
-            Serial.println("[WEIGHT] ✓ Tared");
-          }
-          esp_task_wdt_reset();
-        }
+        Serial.printf("[POS %d] ✓ Removed: %.1fg\n", position + 1, oldWeight);
       }
       break;
   }
 }
 
-// ==================== WEIGHT FUNCTIONS ====================
-float readWeightRobust() {
+float getStableWeight() {
   if (!state.weightSensorReady || !scale.is_ready()) {
     return 0.0;
   }
   
-  // Take 5 readings over 2 seconds
   float readings[NUM_WEIGHT_READINGS];
   unsigned long interval = WEIGHT_STABILIZE_TIME / NUM_WEIGHT_READINGS;
   
   for (int i = 0; i < NUM_WEIGHT_READINGS; i++) {
     if (i > 0) delay(interval);
     readings[i] = scale.get_units(1);
-    esp_task_wdt_reset();
   }
   
-  // Sort for median
   for (int i = 0; i < NUM_WEIGHT_READINGS - 1; i++) {
     for (int j = i + 1; j < NUM_WEIGHT_READINGS; j++) {
       if (readings[i] > readings[j]) {
@@ -517,7 +438,6 @@ float readWeightRobust() {
   
   float median = readings[NUM_WEIGHT_READINGS / 2];
   
-  // Average readings within threshold of median
   float sum = 0.0;
   int count = 0;
   
@@ -605,21 +525,38 @@ void updateBlinkingLEDs() {
 void setCOBLighting(uint16_t temperature, uint8_t brightness) {
   temperature = constrain(temperature, TEMP_MIN, TEMP_MAX);
   brightness = constrain(brightness, 0, 100);
-  
+
+  Serial.printf("[COB] Setting T=%dK B=%d%%\n", temperature, brightness);
+
   if (brightness == 0) {
+    // Turn off: detach, reset, reattach
+    ledcDetach(COB_WARM_PIN);
+    ledcDetach(COB_COOL_PIN);
+    delay(50);
+    pinMode(COB_WARM_PIN, OUTPUT);
+    pinMode(COB_COOL_PIN, OUTPUT);
+    digitalWrite(COB_WARM_PIN, LOW);
+    digitalWrite(COB_COOL_PIN, LOW);
+    delay(50);
+    ledcAttach(COB_WARM_PIN, COB_PWM_FREQUENCY, COB_PWM_RESOLUTION);
+    ledcAttach(COB_COOL_PIN, COB_PWM_FREQUENCY, COB_PWM_RESOLUTION);
     ledcWrite(COB_WARM_PIN, 0);
     ledcWrite(COB_COOL_PIN, 0);
+    Serial.println("[COB] OFF");
   } else {
     float warmRatio = map(temperature, TEMP_MIN, TEMP_MAX, 100, 0) / 100.0;
     float coolRatio = 1.0 - warmRatio;
-    uint8_t maxPWM = map(brightness, 0, 100, 0, 255);
+
+    uint8_t maxPWM = map(brightness, 0, 100, 0, PWM_MAX);
     uint8_t warmPWM = maxPWM * warmRatio;
     uint8_t coolPWM = maxPWM * coolRatio;
-    
+
     ledcWrite(COB_WARM_PIN, warmPWM);
     ledcWrite(COB_COOL_PIN, coolPWM);
+    
+    Serial.printf("[COB] Warm=%d Cool=%d (%.2f/%.2f)\n", warmPWM, coolPWM, warmRatio, coolRatio);
   }
-  
+
   state.currentTemperature = temperature;
   state.currentBrightness = brightness;
 }
@@ -632,15 +569,21 @@ void onMQTTMessage(char* topic, byte* payload, unsigned int length) {
   memcpy(message, payload, length);
   message[length] = '\0';
   
+  Serial.printf("[MQTT] RX: %s\n", message);
+  
   StaticJsonDocument<1536> doc;
   if (deserializeJson(doc, message) == DeserializationError::Ok) {
     handleCommand(doc);
+  } else {
+    Serial.println("[MQTT] JSON parse error");
   }
 }
 
 void handleCommand(JsonDocument& doc) {
   String action = doc["action"];
   JsonObject data = doc["data"];
+  
+  Serial.println("[MQTT] Action: " + action);
   
   if (action == "set_leds") {
     JsonArray positionsArray = data["positions"];
@@ -653,6 +596,8 @@ void handleCommand(JsonDocument& doc) {
       if (position >= 1 && position <= 9) {
         uint32_t color = strtol(colorStr.c_str() + 1, NULL, 16);
         setLED(position, color, brightness, blink);
+        Serial.printf("[LED] Pos %d: %s @%d%% Blink:%d\n", 
+                     position, colorStr.c_str(), brightness, blink);
       }
     }
   }
@@ -691,7 +636,6 @@ void sendHeartbeat() {
   JsonObject data = doc.createNestedObject("data");
   data["uptime"] = millis() / 1000;
   
-  // Total weight
   float total = 0.0;
   for (int i = 0; i < 9; i++) total += state.individualWeights[i];
   data["total_weight"] = round(total * 10.0) / 10.0;
@@ -699,7 +643,6 @@ void sendHeartbeat() {
   data["temperature"] = state.ambientTemperature;
   data["humidity"] = state.ambientHumidity;
   
-  // Compact arrays
   JsonArray occupied = data.createNestedArray("occupied");
   for (int i = 0; i < 9; i++) occupied.add(state.positions[i] ? 1 : 0);
   
