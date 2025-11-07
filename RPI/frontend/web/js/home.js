@@ -70,6 +70,8 @@ const modalActions = {
     zonesConfig.forEach(({ key }) => {
       if (form.dataset.type.toLowerCase().includes(key)) {
         const { temperature: target, humidity, mode } = formData
+        
+        // MODIFIED: 'action' and parameters are nested inside 'data'
         const data = {
           action: 'update_setting',
           mode,
@@ -77,15 +79,17 @@ const modalActions = {
           humidity,
           zone: key,
         }
+        
         const payload = {
           timestamp: new Date().toISOString(),
           source: 'web_client',
           target: 'rpi_server',
           message_type: 'command',
-          data,
+          data, // Send the nested data object
         }
         const message = JSON.stringify(payload)
         publish(TOPICS.WEB_TO_RPI_COMMAND, message)
+        
         ////temporary fetch request to update inventory
         try {
           fetch(`http://localhost:${port}/update-inventory`, {
@@ -93,7 +97,7 @@ const modalActions = {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(data),
+            body: JSON.stringify(data), // Send nested data here too
           })
             .then((res) => res.json())
             .then((response) => {
@@ -113,42 +117,44 @@ const modalActions = {
     const key = form.dataset.key
     const formData = getZoneLightning(form)
 
-    // Build the core command data
-    const commandData = {
-      action: 'set_brightness', // <-- Top-level action
+    // MODIFIED: 'action' and parameters are nested inside 'data'
+    const data = {
+      action: 'set_brightness',
       zone: key,
       value: formData.brightness,
       color_temp: formData.colorType,
     }
 
-    // Create a flat payload by spreading the command data
     const payload = {
       timestamp: new Date().toISOString(),
       source: 'web_client',
       target: 'rpi_server',
       message_type: 'command',
-      ...commandData // <-- Use spread operator to merge all keys to top level
+      data, // Send the nested data object
     }
-
-    // The resulting JSON will now have 'action' at the top level
+    
     const message = JSON.stringify(payload)
     publish(TOPICS.WEB_TO_RPI_COMMAND, message)
   },
   'fridge-lighting-modal-save': (btn) => {
     const form = btn.closest('.form')
     const formData = getFridgeLighting(form)
+
+    // MODIFIED: 'action' and parameters are nested inside 'data'
     const data = {
       action: 'set_lighting_mode',
       energy_saving: formData.savingMode,
       night_mode: formData.nightMode,
     }
+    
     const payload = {
       timestamp: new Date().toISOString(),
       source: 'web_client',
       target: 'rpi_server',
       message_type: 'command',
-      data,
+      data, // Send the nested data object
     }
+    
     const message = JSON.stringify(payload)
     publish(TOPICS.WEB_TO_RPI_COMMAND, message)
   },

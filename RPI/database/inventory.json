@@ -327,34 +327,16 @@
       "mode": "red",
       "positions": {
         "1": {
-          "occupied": true,
-          "barcode": "8410310606168",
-          "name": "Hoya de Cadenas Cabernet Sauvignon Crianza",
-          "weight": 923.5,
-          "fill_percentage": 100,
-          "placed_date": "2025-11-06T13:44:27.448544",
-          "aging_days": 0
+          "occupied": false
         },
         "2": {
           "occupied": false
         },
         "3": {
-          "occupied": true,
-          "barcode": "8420906059308",
-          "name": "Montesierra Young Red Wine",
-          "weight": 1150,
-          "fill_percentage": 100,
-          "placed_date": "2025-11-06T13:40:50.052978",
-          "aging_days": 0
+          "occupied": false
         },
         "4": {
-          "occupied": true,
-          "barcode": "8410261111025",
-          "name": "Pata Negra Crianza",
-          "weight": 880.1,
-          "fill_percentage": 100,
-          "placed_date": "2025-11-06T13:44:34.687339",
-          "aging_days": 0
+          "occupied": false
         },
         "5": {
           "occupied": false
@@ -363,13 +345,7 @@
           "occupied": false
         },
         "7": {
-          "occupied": true,
-          "barcode": "8420209033869",
-          "name": "Silanus Young Red",
-          "weight": 3458,
-          "fill_percentage": 100,
-          "placed_date": "2025-11-06T13:40:38.413072",
-          "aging_days": 0
+          "occupied": false
         },
         "8": {
           "occupied": false
