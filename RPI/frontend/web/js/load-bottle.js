@@ -43,30 +43,21 @@ const modalActions = {
     publish(TOPICS.WEB_TO_RPI_COMMAND, message)
   },
   'load-bottle-welcome-modal': () => {
-    // If coming from info modal (user pressed back), cancel the load operation
+    // If coming from info modal (user pressed back), just clear scannedBottle
+    // NO cancel_load because there's no pending_operation yet
     const fromInfoModal = loadBottleInfoModal?.classList.contains('active')
     if (fromInfoModal && scannedBottle) {
-      console.log('[LOAD] User cancelled from info modal, sending cancel_load')
-      const data = {
-        action: 'cancel_load',
-        barcode: scannedBottle.barcode
-      }
-      const payload = {
-        timestamp: new Date().toISOString(),
-        source: 'web',
-        data: data
-      }
-      publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
+      console.log('[LOAD] User cancelled from info modal, clearing scannedBottle (no backend operation to cancel)')
       scannedBottle = null  // Clear scanned bottle
     }
 
     // If coming from drawer modal (user pressed back during placement), cancel the load operation
     const fromDrawerModal = loadBottleDrawerModal?.classList.contains('active')
-    if (fromDrawerModal && scannedBottle) {
+    if (fromDrawerModal) {
       console.log('[LOAD] User cancelled from drawer modal, sending cancel_load')
       const data = {
         action: 'cancel_load',
-        barcode: scannedBottle.barcode
+        barcode: scannedBottle?.barcode || 'unknown'
       }
       const payload = {
         timestamp: new Date().toISOString(),

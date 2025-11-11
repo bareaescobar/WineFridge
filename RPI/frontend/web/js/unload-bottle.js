@@ -136,26 +136,32 @@ const mqttActions = {
     unloadBottleSuccessModal.classList.add('active')
   },
 
-  // Handle wrong position error during unload
-  unload_error(data) {
-    console.log('[UNLOAD] Error detected:', data)
+  // Handle wrong bottle removed during unload
+  wrong_bottle_removed(data) {
+    console.log('[UNLOAD] Wrong bottle removed:', data)
 
-    if (data.error === 'wrong_bottle_removed' && unloadErrorModal) {
+    if (unloadErrorModal) {
       // Update modal text with specific positions
       if (unloadErrorTitle) {
         unloadErrorTitle.innerHTML = `Wrong Bottle<br/>Removed`
       }
       if (unloadErrorSubtitle) {
-        unloadErrorSubtitle.innerHTML = `You removed position <strong>${data.wrong_position}</strong>.<br/>Please remove position <strong>${data.correct_position}</strong> instead.<br/><br/>LEDs show: <span style="color: red">RED = wrong</span>, <span style="color: green">GREEN = correct</span>`
+        unloadErrorSubtitle.innerHTML = `You removed position <strong>${data.position}</strong>.<br/>Please remove position <strong>${data.expected_position}</strong> instead.<br/><br/>LEDs show: <span style="color: red">RED = wrong</span>, <span style="color: green">GREEN = correct</span>`
       }
 
       // Hide drawer modal and show error modal
       unloadBottleDrawerModal.classList.remove('active')
       unloadErrorModal.classList.add('active')
     } else {
-      // Fallback to alert for other errors
-      alert(`⚠️ Unload Error\n\n${data.error || 'Unknown error'}`)
+      // Fallback to alert if modal doesn't exist
+      alert(`⚠️ Wrong Bottle Removed\n\nYou removed position ${data.position}.\nPlease remove position ${data.expected_position} instead.`)
     }
+  },
+
+  // Handle other unload errors (kept for compatibility)
+  unload_error(data) {
+    console.log('[UNLOAD] Error detected:', data)
+    alert(`⚠️ Unload Error\n\n${data.error || 'Unknown error'}`)
   },
 }
 
