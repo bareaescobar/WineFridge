@@ -1288,13 +1288,17 @@ class WineFridgeController:
             threading.Thread(target=fade_out).start()
 
         else:
-            print(f"[WARN] ✗ Unexpected bottle placed at {drawer_id} pos {position}")
-            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                "action": "set_leds",
-                "source": "mqtt_handler",
-                "data": {"positions": [{"position": position, "color": "#FF0000", "brightness": 100, "blink": True}]},
-                "timestamp": datetime.now().isoformat()
-            }))
+            # No active LOAD operation - check if position was already occupied
+            # If so, this is just the ESP32 re-detecting an existing bottle, ignore it
+            if drawer_id in self.inventory.get("drawers", {}):
+                positions = self.inventory["drawers"][drawer_id].get("positions", {})
+                if str(position) in positions and positions[str(position)].get("occupied", False):
+                    print(f"[LOAD] ℹ Position {position} already occupied, ignoring placed event (no active operation)")
+                    return
+
+            # Position was empty but no LOAD operation active - this is unexpected
+            print(f"[WARN] ✗ Unexpected bottle placed at {drawer_id} pos {position} (no active operation)")
+            # Do NOT mark with LED - user might be manually placing bottles outside of LOAD process
 
     def handle_bottle_removed(self, drawer_id, position):
         """Handle 'removed' event when not in swap mode"""
