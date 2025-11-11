@@ -8,6 +8,9 @@ const port = 3000
 
 const swapBottlesModal = document.getElementById('swap-bottles-modal')
 const swapBottlesSuccessModal = document.getElementById('swap-bottles-success-modal')
+const swapErrorModal = document.getElementById('swap-error-modal')
+const swapErrorTitle = swapErrorModal?.querySelector('#swap-error-title')
+const swapErrorSubtitle = swapErrorModal?.querySelector('#swap-error-subtitle')
 const swapGroup = document.querySelector('.swap-group')
 const bottleBtns = swapGroup.querySelectorAll('.bottle-placeholder')
 const [firstBtn, secondBtn] = bottleBtns
@@ -29,12 +32,16 @@ function startSwapMode() {
   console.log('[SWAP] Starting swap mode')
   bottlesRemoved = 0
   
-  // Notify backend to start swap mode
-  const payload = {
-    action: 'start_swap',
-    source: 'web',
-    timestamp: new Date().toISOString()
+  // FIXED: 'action' now inside 'data'
+  const data = {
+    action: 'start_swap'
   }
+  const payload = {
+    timestamp: new Date().toISOString(),
+    source: 'web',
+    data: data
+  }
+  
   publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
 }
 
@@ -75,6 +82,29 @@ const mqttActions = {
     } else {
       alert('Swap failed. Please try again.')
       resetScene()
+    }
+  },
+
+  // Handle wrong position error during swap
+  swap_error(data) {
+    console.log('[SWAP] Error detected:', data)
+
+    if (data.error === 'wrong_swap_position' && swapErrorModal) {
+      const expectedPos = data.expected_positions ? data.expected_positions.join(' or ') : 'correct position'
+
+      // Update modal text with specific positions
+      if (swapErrorTitle) {
+        swapErrorTitle.innerHTML = `Wrong Position<br/>During Swap`
+      }
+      if (swapErrorSubtitle) {
+        swapErrorSubtitle.innerHTML = `You placed bottle at position <strong>${data.wrong_position}</strong>.<br/>Please place at position <strong>${expectedPos}</strong> instead.<br/><br/>LEDs show: <span style="color: red">RED = wrong</span>, <span style="color: green">GREEN = correct</span>`
+      }
+
+      // Show error modal
+      swapErrorModal.classList.add('active')
+    } else {
+      // Fallback to alert for other errors
+      alert(`⚠️ Swap Error\n\n${data.error || 'Unknown error'}`)
     }
   }
 }

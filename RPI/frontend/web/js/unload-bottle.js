@@ -17,27 +17,39 @@ const unloadBottleInfoModal = document.getElementById('unload-bottle-info-modal'
 const unloadBottleDrawerModal = document.getElementById('take-bottle-drawer-modal')
 const mealRecommendModal = document.getElementById('meal-recommend-modal')
 const unloadBottleSuccessModal = document.getElementById('take-bottle-success-modal')
+const unloadErrorModal = document.getElementById('unload-error-modal')
+const unloadErrorTitle = unloadErrorModal?.querySelector('#unload-error-title')
+const unloadErrorSubtitle = unloadErrorModal?.querySelector('#unload-error-subtitle')
 const list = unloadBottleManuallyModal.querySelector('.products-list')
 const recommendList = mealRecommendModal.querySelector('.recommend-group-list')
 const bottleInfoContainer = unloadBottleInfoModal.querySelector('.block-bottle-info')
 
 const port = 3000
 
-const inventory = fetchSync(`http://localhost:${port}/inventory`)
+let inventory = fetchSync(`http://localhost:${port}/inventory`)
+let products = []
 
-const barcodes = Object.values(inventory.drawers).flatMap((drawer) =>
-  Object.values(drawer.positions)
-    .filter((pos) => pos.occupied && pos.barcode)
-    .map((pos) => pos.barcode),
-)
-const barcodesSet = new Set(barcodes);
+function refreshInventory() {
+  inventory = fetchSync(`http://localhost:${port}/inventory`)
 
-const products = Object.entries(wineCatalog.wines)
-  .filter(([barcode]) => barcodesSet.has(barcode))
-  .map(([barcode, product]) => ({
-    ...product,
-    barcode,
-  }))
+  const barcodes = Object.values(inventory.drawers).flatMap((drawer) =>
+    Object.values(drawer.positions)
+      .filter((pos) => pos.occupied && pos.barcode)
+      .map((pos) => pos.barcode),
+  )
+  const barcodesSet = new Set(barcodes)
+
+  products = Object.entries(wineCatalog.wines)
+    .filter(([barcode]) => barcodesSet.has(barcode))
+    .map(([barcode, product]) => ({
+      ...product,
+      barcode,
+    }))
+
+  updateSuggestionTemplate(products, list)
+}
+
+refreshInventory()
 
 const modalActions = {
   'unload-bottle-info-modal': (btn) => {
@@ -71,21 +83,23 @@ const modalActions = {
   },
   'take-bottle-drawer-modal': (btn) => {
     const pickedProduct = products.find((product) => product.barcode === btn.dataset.barcode)
+    
+    // FIXED: 'action' now inside 'data'
+    const data = {
+      action: 'start_unload',
+      barcode: pickedProduct.barcode,
+      name: pickedProduct.name,
+    }
     const payload = {
       timestamp: new Date().toISOString(),
       source: 'web',
-      data: {
-        action: 'start_unload',
-        barcode: pickedProduct.barcode,
-        name: pickedProduct.name,
-      },
+      data: data
     }
+    
     const message = JSON.stringify(payload)
     publish(TOPICS.WEB_TO_RPI_COMMAND, message)
   },
 }
-
-updateSuggestionTemplate(products, list)
 
 document.body.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-target]')
@@ -100,9 +114,32 @@ document.body.addEventListener('click', (e) => {
 })
 
 const mqttActions = {
-  bottle_unloaded() {
+  bottle_unloaded(data) {
+    console.log('[UNLOAD] Bottle unloaded successfully:', data)
     unloadBottleDrawerModal.classList.remove('active')
     unloadBottleSuccessModal.classList.add('active')
+  },
+
+  // Handle wrong position error during unload
+  unload_error(data) {
+    console.log('[UNLOAD] Error detected:', data)
+
+    if (data.error === 'wrong_bottle_removed' && unloadErrorModal) {
+      // Update modal text with specific positions
+      if (unloadErrorTitle) {
+        unloadErrorTitle.innerHTML = `Wrong Bottle<br/>Removed`
+      }
+      if (unloadErrorSubtitle) {
+        unloadErrorSubtitle.innerHTML = `You removed position <strong>${data.wrong_position}</strong>.<br/>Please remove position <strong>${data.correct_position}</strong> instead.<br/><br/>LEDs show: <span style="color: red">RED = wrong</span>, <span style="color: green">GREEN = correct</span>`
+      }
+
+      // Hide drawer modal and show error modal
+      unloadBottleDrawerModal.classList.remove('active')
+      unloadErrorModal.classList.add('active')
+    } else {
+      // Fallback to alert for other errors
+      alert(`⚠️ Unload Error\n\n${data.error || 'Unknown error'}`)
+    }
   },
 }
 

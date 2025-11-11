@@ -26,21 +26,56 @@ const modalActions = {
   'load-bottle-drawer-modal': () => {
     scanCircle.classList.add('active')
     loadBottleInfoModal.classList.remove('active')
-    const payload = {
+    
+    // FIXED: 'action' now inside 'data'
+    const data = {
       action: 'start_load',
-      source: 'web',
-      timestamp: new Date().toISOString(),
-      data: {
-        barcode: scannedBottle.barcode,
-        name: scannedBottle.name,
-      },
+      barcode: scannedBottle.barcode,
+      name: scannedBottle.name,
     }
+    const payload = {
+      timestamp: new Date().toISOString(),
+      source: 'web',
+      data: data
+    }
+    
     const message = JSON.stringify(payload)
     publish(TOPICS.WEB_TO_RPI_COMMAND, message)
   },
   'load-bottle-welcome-modal': () => {
+    // If coming from error modal, send retry_placement to backend
+    const fromErrorModal = loadBottleErrorModal?.classList.contains('active')
+    if (fromErrorModal) {
+      // FIXED: 'action' now inside 'data'
+      const data = {
+        action: 'retry_placement'
+      }
+      const payload = {
+        timestamp: new Date().toISOString(),
+        source: 'web',
+        data: data
+      }
+      publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
+    }
+
+    // If coming from success modal, send load_complete to change LED to white
+    const fromSuccessModal = loadBottleSuccessModal?.classList.contains('active')
+    if (fromSuccessModal) {
+      // FIXED: 'action' now inside 'data'
+      const data = {
+        action: 'load_complete'
+      }
+      const payload = {
+        timestamp: new Date().toISOString(),
+        source: 'web',
+        data: data
+      }
+      publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
+    }
+
     loadBottleInfoModal.classList.remove('active')
     loadBottleErrorModal.classList.remove('active')
+    loadBottleSuccessModal.classList.remove('active')
     scanCircle.classList.remove('active')
   },
 }
@@ -50,15 +85,18 @@ const mqttActions = {
     const extracted = fetchSync(`http://localhost:${port}/extracted`)
     const locations = extracted[data.barcode]?.locations
     if (locations) {
-      const payload = {
+      // FIXED: 'action' now inside 'data'
+      const returnData = {
         action: 'start_return',
-        source: 'web',
-        timestamp: new Date().toISOString(),
-        data: {
-          barcode: data.barcode,
-          locations,
-        },
+        barcode: data.barcode,
+        locations,
       }
+      const payload = {
+        timestamp: new Date().toISOString(),
+        source: 'web',
+        data: returnData
+      }
+      
       const message = JSON.stringify(payload)
       publish(TOPICS.WEB_TO_RPI_COMMAND, message)
       scanCircle.classList.add('active')
@@ -93,6 +131,14 @@ const mqttActions = {
       loadBottleErrorModal.classList.remove('active')
       loadBottleSuccessModal.classList.add('active')
       scannedBottle = null
+    } else if (data.close_screen) {
+      // Timeout occurred - close all load modals and return to welcome screen
+      console.log('[LOAD] Timeout - closing all modals')
+      loadBottleDrawerModal.classList.remove('active')
+      loadBottleErrorModal.classList.remove('active')
+      loadBottleInfoModal.classList.remove('active')
+      scanCircle.classList.remove('active')
+      scannedBottle = null
     }
   },
   
@@ -113,6 +159,31 @@ document.addEventListener('click', (event) => {
     modalActions[target](modalId)
   }
 })
+
+// Handle "Done" button - send load_complete and redirect to home
+const loadDoneBtn = document.getElementById('load-done-btn')
+if (loadDoneBtn) {
+  loadDoneBtn.addEventListener('click', () => {
+    console.log('[LOAD] Done clicked - completing load and going home')
+    
+    // FIXED: 'action' now inside 'data'
+    const data = {
+      action: 'load_complete'
+    }
+    const payload = {
+      timestamp: new Date().toISOString(),
+      source: 'web',
+      data: data
+    }
+    
+    publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
+
+    // Small delay to ensure message is sent before redirect
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 100)
+  })
+}
 
 connectMQTT({
   host: BROKER_URL,
