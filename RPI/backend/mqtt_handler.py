@@ -872,6 +872,14 @@ class WineFridgeController:
         position = data.get('position')
         expected_position = data.get('expected_position')
 
+        # Check if this position is already occupied in inventory
+        # If so, ignore this wrong_placement event (it's not really wrong, it's already occupied)
+        if drawer_id in self.inventory.get("drawers", {}):
+            positions = self.inventory["drawers"][drawer_id].get("positions", {})
+            if str(position) in positions and positions[str(position)].get("occupied", False):
+                print(f"[LOAD] ℹ Position {position} already occupied, ignoring wrong_placement event")
+                return
+
         print(f"[LOAD] ✗ Wrong placement! Expected #{expected_position}, got #{position}")
 
         for op_id, op in list(self.pending_operations.items()):
