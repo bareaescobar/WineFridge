@@ -44,11 +44,22 @@ setTimeout(() => {
       e.preventDefault()
       console.log('[SHUTDOWN] Sending shutdown command...')
       
-      const payload = {
-        action: 'shutdown',
-        source: 'web',
-        timestamp: new Date().toISOString()
+      // ================== MODIFICACIÓN AQUÍ ==================
+      // 1. Crear el objeto 'data' anidado
+      const data = {
+        action: 'shutdown'
+        // 'source' puede ir fuera, como en los otros ficheros
       }
+      
+      // 2. Crear el payload principal
+      const payload = {
+        timestamp: new Date().toISOString(),
+        source: 'web',
+        target: 'rpi_server', // Añadido por consistencia
+        message_type: 'command', // Añadido por consistencia
+        data: data // Enviar el objeto 'data' anidado
+      }
+      // ================== FIN DE MODIFICACIÓN ==================
       
       publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
       console.log('[SHUTDOWN] Command sent')
