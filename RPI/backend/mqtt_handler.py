@@ -306,7 +306,7 @@ class WineFridgeController:
     # MODIFIED: Now receives the 'data' object directly
     def handle_system_command(self, data):
         action = data.get('action')
-        
+
         # All handlers will receive the 'data' object
         if action == 'start_load':
             self.start_bottle_load(data)
@@ -314,6 +314,10 @@ class WineFridgeController:
             self.start_bottle_unload(data)
         elif action == 'start_swap':
             self.start_swap_bottles() # This action needs no data
+        elif action == 'cancel_load':
+            self.cancel_load(data)
+        elif action == 'cancel_unload':
+            self.cancel_unload(data)
         elif action == 'cancel_swap':
             self.cancel_swap() # This action needs no data
         elif action == 'retry_placement':
@@ -743,6 +747,77 @@ class WineFridgeController:
             'start_time': None
         }
         print("[SWAP] Cancelled\n")
+
+    def cancel_load(self, data):
+        """Cancel an ongoing load operation"""
+        barcode = data.get('barcode', 'unknown')
+        print(f"\n[LOAD] ═══════════════════════════════")
+        print(f"[LOAD] Cancelling load operation for {barcode}")
+
+        # Find and cancel any pending load operation
+        cancelled = False
+        for op_id, op in list(self.pending_operations.items()):
+            if op.get('type') == 'load':
+                drawer_id = op.get('drawer')
+                position = op.get('position')
+
+                # Cancel timer
+                if 'timer' in op:
+                    op['timer'].cancel()
+
+                # Turn off all LEDs for this operation
+                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                    "action": "set_leds",
+                    "source": "mqtt_handler",
+                    "data": {"positions": []},
+                    "timestamp": datetime.now().isoformat()
+                }))
+
+                # Remove the pending operation
+                del self.pending_operations[op_id]
+                print(f"[LOAD] ✔ Cancelled operation for {drawer_id} position {position}")
+                cancelled = True
+                break
+
+        if not cancelled:
+            print(f"[LOAD] No pending load operation found")
+
+        print(f"[LOAD] ═══════════════════════════════\n")
+
+    def cancel_unload(self, data):
+        """Cancel an ongoing unload operation"""
+        print(f"\n[UNLOAD] ═══════════════════════════════")
+        print(f"[UNLOAD] Cancelling unload operation")
+
+        # Find and cancel any pending unload operation
+        cancelled = False
+        for op_id, op in list(self.pending_operations.items()):
+            if op.get('type') == 'unload':
+                drawer_id = op.get('drawer')
+                position = op.get('position')
+
+                # Cancel timer
+                if 'timer' in op:
+                    op['timer'].cancel()
+
+                # Turn off all LEDs for this operation
+                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                    "action": "set_leds",
+                    "source": "mqtt_handler",
+                    "data": {"positions": []},
+                    "timestamp": datetime.now().isoformat()
+                }))
+
+                # Remove the pending operation
+                del self.pending_operations[op_id]
+                print(f"[UNLOAD] ✔ Cancelled operation for {drawer_id} position {position}")
+                cancelled = True
+                break
+
+        if not cancelled:
+            print(f"[UNLOAD] No pending unload operation found")
+
+        print(f"[UNLOAD] ═══════════════════════════════\n")
 
     def find_bottle_in_inventory(self, barcode):
         for drawer_id in FUNCTIONAL_DRAWERS:

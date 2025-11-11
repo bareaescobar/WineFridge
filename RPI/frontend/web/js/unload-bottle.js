@@ -62,9 +62,25 @@ const modalActions = {
     updateBottleInfoModalWithPosition(pickedProduct, pickedProductPositionDetails, bottleInfoContainer)
   },
   'unload-bottle-welcome-modal': () => {
+    // If coming from drawer modal (user pressed back during unload), cancel the unload operation
+    const fromDrawerModal = unloadBottleDrawerModal?.classList.contains('active')
+    if (fromDrawerModal) {
+      console.log('[UNLOAD] User cancelled from drawer modal, sending cancel_unload')
+      const data = {
+        action: 'cancel_unload'
+      }
+      const payload = {
+        timestamp: new Date().toISOString(),
+        source: 'web',
+        data: data
+      }
+      publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
+    }
+
     unloadBottleSuggestModal.classList.contains('active') && unloadBottleSuggestModal.classList.remove('active')
     mealRecommendModal.classList.contains('active') && mealRecommendModal.classList.remove('active')
     unloadBottleInfoModal.classList.contains('active') && unloadBottleInfoModal.classList.remove('active')
+    unloadBottleDrawerModal.classList.contains('active') && unloadBottleDrawerModal.classList.remove('active')
     unloadBottleSuccessModal.classList.contains('active') && unloadBottleSuccessModal.classList.remove('active')
     unloadBottleManuallyModal.classList.contains('active') && unloadBottleManuallyModal.classList.remove('active')
   },

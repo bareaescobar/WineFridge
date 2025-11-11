@@ -130,3 +130,44 @@ document.addEventListener('click', (event) => {
     startSwapMode()
   }
 })
+
+// Cancel swap operation when user navigates away or closes the page
+window.addEventListener('beforeunload', () => {
+  console.log('[SWAP] Page unloading, sending cancel_swap')
+  const data = {
+    action: 'cancel_swap'
+  }
+  const payload = {
+    timestamp: new Date().toISOString(),
+    source: 'web',
+    data: data
+  }
+
+  // Use navigator.sendBeacon for reliable delivery during page unload
+  const message = JSON.stringify(payload)
+  const blob = new Blob([message], { type: 'application/json' })
+  // Fallback to regular publish if sendBeacon is not available
+  if (navigator.sendBeacon) {
+    // Note: MQTT over WebSocket doesn't work with sendBeacon, so we use publish
+    publish(TOPICS.WEB_TO_RPI_COMMAND, message)
+  } else {
+    publish(TOPICS.WEB_TO_RPI_COMMAND, message)
+  }
+})
+
+// Also handle when user navigates to another page within the app
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('a[href]')
+  if (link && link.href && !link.href.includes('swap-bottle')) {
+    console.log('[SWAP] Navigating away, sending cancel_swap')
+    const data = {
+      action: 'cancel_swap'
+    }
+    const payload = {
+      timestamp: new Date().toISOString(),
+      source: 'web',
+      data: data
+    }
+    publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
+  }
+})

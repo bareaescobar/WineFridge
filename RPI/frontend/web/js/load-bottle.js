@@ -43,6 +43,40 @@ const modalActions = {
     publish(TOPICS.WEB_TO_RPI_COMMAND, message)
   },
   'load-bottle-welcome-modal': () => {
+    // If coming from info modal (user pressed back), cancel the load operation
+    const fromInfoModal = loadBottleInfoModal?.classList.contains('active')
+    if (fromInfoModal && scannedBottle) {
+      console.log('[LOAD] User cancelled from info modal, sending cancel_load')
+      const data = {
+        action: 'cancel_load',
+        barcode: scannedBottle.barcode
+      }
+      const payload = {
+        timestamp: new Date().toISOString(),
+        source: 'web',
+        data: data
+      }
+      publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
+      scannedBottle = null  // Clear scanned bottle
+    }
+
+    // If coming from drawer modal (user pressed back during placement), cancel the load operation
+    const fromDrawerModal = loadBottleDrawerModal?.classList.contains('active')
+    if (fromDrawerModal && scannedBottle) {
+      console.log('[LOAD] User cancelled from drawer modal, sending cancel_load')
+      const data = {
+        action: 'cancel_load',
+        barcode: scannedBottle.barcode
+      }
+      const payload = {
+        timestamp: new Date().toISOString(),
+        source: 'web',
+        data: data
+      }
+      publish(TOPICS.WEB_TO_RPI_COMMAND, JSON.stringify(payload))
+      scannedBottle = null  // Clear scanned bottle
+    }
+
     // If coming from error modal, send retry_placement to backend
     const fromErrorModal = loadBottleErrorModal?.classList.contains('active')
     if (fromErrorModal) {
@@ -74,6 +108,7 @@ const modalActions = {
     }
 
     loadBottleInfoModal.classList.remove('active')
+    loadBottleDrawerModal.classList.remove('active')
     loadBottleErrorModal.classList.remove('active')
     loadBottleSuccessModal.classList.remove('active')
     scanCircle.classList.remove('active')
