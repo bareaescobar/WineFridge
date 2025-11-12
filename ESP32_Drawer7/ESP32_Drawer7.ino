@@ -1,5 +1,5 @@
 /*
- * WineFridge Drawer ESP32_DRAWER7 v6.0.0
+ * WineFridge Drawer ESP32_DRAWER7 v6.1.0
  *
  * BASED ON WORKING v33 PATTERN
  * - NO OTA (conflicts with GPIO 2)
@@ -7,7 +7,7 @@
  * - Uses pinMode + ledcDetach + ledcAttach pattern
  * - Detects existing bottles on startup
  * - Tares scale before each LOAD operation
- * - Differential weight calculation for accurate individual bottle weights
+ * - Smart weight measurement: TARE for LOAD, differential for manual
  */
 
 #include <WiFi.h>
@@ -19,7 +19,7 @@
 #include "Adafruit_SHT31.h"
 
 #define DRAWER_ID "drawer_7"
-#define FIRMWARE_VERSION "6.0.0"
+#define FIRMWARE_VERSION "6.1.0"
 
 // WiFi
 #define WIFI_SSID_1 "Solo Spirits"
@@ -380,12 +380,19 @@ void updatePositionStateMachine(uint8_t position) {
         setLED(position + 1, 0x000000, 0, false);
       } else if (millis() - pos->stateTimer > WEIGHT_STABILIZE_TIME) {
         float totalWeightNow = getStableWeight();
+        float individualWeight;
 
-        // Calculate individual bottle weight: difference between current and previous total
-        float individualWeight = totalWeightNow - pos->weightBeforePlacement;
-
-        Serial.printf("[POS %d] Total weight: %.1fg, Before: %.1fg, Individual: %.1fg\n",
-                     position + 1, totalWeightNow, pos->weightBeforePlacement, individualWeight);
+        // If this position is expected (LOAD process), scale was TARED - read total weight directly
+        if (state.expectedPosition == (position + 1)) {
+          individualWeight = totalWeightNow;
+          Serial.printf("[POS %d] LOAD process - Total weight: %.1fg (scale was tared)\n",
+                       position + 1, totalWeightNow);
+        } else {
+          // Manual placement - calculate differential weight
+          individualWeight = totalWeightNow - pos->weightBeforePlacement;
+          Serial.printf("[POS %d] Manual placement - Total: %.1fg, Before: %.1fg, Individual: %.1fg\n",
+                       position + 1, totalWeightNow, pos->weightBeforePlacement, individualWeight);
+        }
 
         if (individualWeight > WEIGHT_THRESHOLD) {
           pos->weight = individualWeight;
@@ -396,7 +403,7 @@ void updatePositionStateMachine(uint8_t position) {
           setLED(position + 1, 0x808080, 30, false);
           sendBottleEvent(position + 1, true, individualWeight);
 
-          Serial.printf("[POS %d] ✓ Placed: %.1fg (individual weight)\n", position + 1, individualWeight);
+          Serial.printf("[POS %d] ✓ Placed: %.1fg\n", position + 1, individualWeight);
 
           if (state.expectedPosition == (position + 1)) {
             state.expectedPosition = 0;
