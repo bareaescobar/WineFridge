@@ -1,5 +1,5 @@
 /*
- * WineFridge Drawer ESP32_DRAWER7 v5.9.0
+ * WineFridge Drawer ESP32_DRAWER7 v6.0.0
  *
  * BASED ON WORKING v33 PATTERN
  * - NO OTA (conflicts with GPIO 2)
@@ -7,6 +7,7 @@
  * - Uses pinMode + ledcDetach + ledcAttach pattern
  * - Detects existing bottles on startup
  * - Tares scale before each LOAD operation
+ * - Differential weight calculation for accurate individual bottle weights
  */
 
 #include <WiFi.h>
@@ -18,7 +19,7 @@
 #include "Adafruit_SHT31.h"
 
 #define DRAWER_ID "drawer_7"
-#define FIRMWARE_VERSION "5.9.0"
+#define FIRMWARE_VERSION "6.0.0"
 
 // WiFi
 #define WIFI_SSID_1 "Solo Spirits"
@@ -71,6 +72,7 @@ struct BottlePosition {
   unsigned long stateTimer;
   float weight;
   uint8_t debounceCount;
+  float weightBeforePlacement;  // Track total weight before this bottle was placed
 };
 
 struct LEDBlinkState {
@@ -357,6 +359,15 @@ void updatePositionStateMachine(uint8_t position) {
           
           pos->state = STATE_WEIGHING;
           pos->stateTimer = millis();
+
+          // Save current total weight before placing bottle (for differential calculation)
+          if (scale.is_ready()) {
+            pos->weightBeforePlacement = scale.get_units(3);
+            Serial.printf("[POS %d] Weight before: %.1fg\n", position + 1, pos->weightBeforePlacement);
+          } else {
+            pos->weightBeforePlacement = 0.0;
+          }
+
           setLED(position + 1, 0x00FF00, 50, true);
           Serial.printf("[POS %d] Weighing...\n", position + 1);
         }
@@ -368,24 +379,30 @@ void updatePositionStateMachine(uint8_t position) {
         pos->state = STATE_EMPTY;
         setLED(position + 1, 0x000000, 0, false);
       } else if (millis() - pos->stateTimer > WEIGHT_STABILIZE_TIME) {
-        float weight = getStableWeight();
-        
-        if (weight > WEIGHT_THRESHOLD) {
-          pos->weight = weight;
-          state.individualWeights[position] = weight;
+        float totalWeightNow = getStableWeight();
+
+        // Calculate individual bottle weight: difference between current and previous total
+        float individualWeight = totalWeightNow - pos->weightBeforePlacement;
+
+        Serial.printf("[POS %d] Total weight: %.1fg, Before: %.1fg, Individual: %.1fg\n",
+                     position + 1, totalWeightNow, pos->weightBeforePlacement, individualWeight);
+
+        if (individualWeight > WEIGHT_THRESHOLD) {
+          pos->weight = individualWeight;
+          state.individualWeights[position] = individualWeight;
           state.positions[position] = true;
           pos->state = STATE_OCCUPIED;
-          
+
           setLED(position + 1, 0x808080, 30, false);
-          sendBottleEvent(position + 1, true, weight);
-          
-          Serial.printf("[POS %d] ✓ Placed: %.1fg\n", position + 1, weight);
-          
+          sendBottleEvent(position + 1, true, individualWeight);
+
+          Serial.printf("[POS %d] ✓ Placed: %.1fg (individual weight)\n", position + 1, individualWeight);
+
           if (state.expectedPosition == (position + 1)) {
             state.expectedPosition = 0;
           }
         } else {
-          Serial.printf("[POS %d] ✗ Weight too low: %.1fg\n", position + 1, weight);
+          Serial.printf("[POS %d] ✗ Weight too low: %.1fg\n", position + 1, individualWeight);
           pos->state = STATE_EMPTY;
           setLED(position + 1, 0xFF0000, 100, true);
           delay(2000);

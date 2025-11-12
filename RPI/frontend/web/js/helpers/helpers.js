@@ -580,7 +580,19 @@ export function animateSwapPlaceholders() {
   }, 500)
 }
 
-export function calculateVolumePercent(weight, emptyWeight = 500, fullWeight = 1200) {
+export function calculateVolumePercent(weight, emptyWeight = 300, fullWeight = 700) {
+  // Synchronized with backend values:
+  // EMPTY_BOTTLE_WEIGHT = 300g
+  // MIN_FULL_BOTTLE_WEIGHT = 700g
+
+  if (weight < emptyWeight) {
+    return 0
+  }
+
+  if (weight >= fullWeight) {
+    return 100
+  }
+
   const liquidWeight = fullWeight - emptyWeight
   const rawPercent = ((weight - emptyWeight) / liquidWeight) * 100
   return Math.max(0, Math.min(100, Math.round(rawPercent)))
