@@ -125,13 +125,18 @@ void setup() {
   setupLEDs();
   setupCOBLEDs();
   setupSensors();
-  setupNetwork();
-  
+
+  // Initialize all positions as empty first
   for (int i = 0; i < 9; i++) {
     positions[i].state = STATE_EMPTY;
     positions[i].weight = 0.0;
   }
-  
+
+  setupNetwork();
+
+  // Detect existing bottles after network is ready
+  detectExistingBottles();
+
   Serial.println("\n[READY]\n");
 }
 
@@ -705,13 +710,68 @@ void sendStartupMessage() {
   Serial.println("[MQTT] Startup sent");
 }
 
+void detectExistingBottles() {
+  Serial.println("[INIT] Detecting existing bottles...");
+
+  if (!state.weightSensorReady) {
+    Serial.println("[INIT] ✗ Weight sensor not ready, skipping detection");
+    return;
+  }
+
+  delay(1000); // Wait for weight sensor to stabilize after tare
+
+  // Count pressed switches (bottles present)
+  int bottlesPresent = 0;
+  bool switchStates[9];
+
+  for (int i = 0; i < 9; i++) {
+    switchStates[i] = (digitalRead(SWITCH_PINS[i]) == LOW);
+    if (switchStates[i]) {
+      bottlesPresent++;
+    }
+  }
+
+  if (bottlesPresent == 0) {
+    Serial.println("[INIT] No bottles detected");
+    return;
+  }
+
+  // Read total weight
+  float totalWeight = getStableWeight();
+
+  if (totalWeight < (WEIGHT_THRESHOLD * bottlesPresent * 0.5)) {
+    // Weight too low, probably false detection
+    Serial.printf("[INIT] ✗ Weight too low: %.1fg for %d bottles\n", totalWeight, bottlesPresent);
+    return;
+  }
+
+  // Estimate individual weight (simple average)
+  float estimatedWeight = totalWeight / bottlesPresent;
+
+  Serial.printf("[INIT] Found %d bottles, total weight: %.1fg\n", bottlesPresent, totalWeight);
+
+  // Mark positions as occupied
+  for (int i = 0; i < 9; i++) {
+    if (switchStates[i]) {
+      positions[i].state = STATE_OCCUPIED;
+      positions[i].weight = estimatedWeight;
+      state.positions[i] = true;
+      state.individualWeights[i] = estimatedWeight;
+
+      Serial.printf("[INIT] ✓ Position %d occupied (est. %.1fg)\n", i + 1, estimatedWeight);
+    }
+  }
+
+  Serial.println("[INIT] ✓ Detection complete\n");
+}
+
 void maintainConnections() {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("[WIFI] Reconnecting...");
     WiFi.reconnect();
     return;
   }
-  
+
   if (!mqttClient.connected()) {
     Serial.println("[MQTT] Reconnecting...");
     connectMQTT();
