@@ -231,11 +231,53 @@ class WineFridgeController:
             print(f"[MQTT] ✔ Connected")
         else:
             print(f"[MQTT] ✗ Connection failed: {rc}")
-            
+
         client.subscribe("winefridge/+/status")
         client.subscribe("winefridge/system/command")
         client.subscribe("winefridge/system/status")
         print("[MQTT] ✔ Subscribed to topics")
+
+        # Sync LEDs with current inventory state
+        self.sync_leds_with_inventory()
+
+    def sync_leds_with_inventory(self):
+        """Synchronize drawer LEDs with current inventory state on startup"""
+        print("[SYNC] Synchronizing LEDs with inventory...")
+
+        for drawer_id in FUNCTIONAL_DRAWERS:
+            if drawer_id in self.inventory.get("drawers", {}):
+                positions_data = self.inventory["drawers"][drawer_id].get("positions", {})
+                led_positions = []
+
+                # Add gray LEDs for occupied positions
+                for pos_str, pos_data in positions_data.items():
+                    if pos_data.get("occupied", False):
+                        led_positions.append({
+                            "position": int(pos_str),
+                            "color": "#808080",
+                            "brightness": 30
+                        })
+
+                # Send LED command for this drawer
+                if led_positions:
+                    self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                        "action": "set_leds",
+                        "source": "mqtt_handler",
+                        "data": {"positions": led_positions},
+                        "timestamp": datetime.now().isoformat()
+                    }))
+                    print(f"[SYNC] → {drawer_id}: {len(led_positions)} occupied positions")
+                else:
+                    # Turn off all LEDs if drawer is empty
+                    self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                        "action": "set_leds",
+                        "source": "mqtt_handler",
+                        "data": {"positions": []},
+                        "timestamp": datetime.now().isoformat()
+                    }))
+                    print(f"[SYNC] → {drawer_id}: empty")
+
+        print("[SYNC] ✔ LED synchronization complete\n")
 
     def on_disconnect(self, client, userdata, flags, rc, properties):
         if rc != 0:
@@ -855,41 +897,59 @@ class WineFridgeController:
         return None, None
 
     def handle_drawer_status(self, drawer_id, message):
+        """Process bottle events only when there's an active operation"""
         data = message.get('data', {})
         event = data.get('event')
         position = data.get('position')
         weight = data.get('weight', 0)
-        
+
+        # Process SWAP operations (highest priority)
         if self.swap_operations.get('active'):
             self.handle_swap_event(drawer_id, position, event, weight)
-        elif event == 'placed':
+            return
+
+        # Check if there's any active LOAD/UNLOAD operation
+        has_active_operation = len(self.pending_operations) > 0
+
+        # If no active operation, ignore all bottle events (ESP32 might be re-detecting existing bottles)
+        if not has_active_operation:
+            return
+
+        # Process LOAD/UNLOAD operations
+        if event == 'placed':
             self.handle_bottle_placed(drawer_id, position, weight)
         elif event == 'removed':
             self.handle_bottle_removed(drawer_id, position)
 
     def handle_wrong_placement(self, drawer_id, message):
+        """Handle wrong placement events only during active LOAD operations"""
+        # Only process if there's an active operation
+        if not self.pending_operations:
+            return
+
         data = message.get('data', {})
         position = data.get('position')
         expected_position = data.get('expected_position')
 
         # Check if this position is already occupied in inventory
-        # If so, ignore this wrong_placement event (it's not really wrong, it's already occupied)
+        # If so, ignore (ESP32 is detecting an existing bottle, not a wrong placement)
         if drawer_id in self.inventory.get("drawers", {}):
             positions = self.inventory["drawers"][drawer_id].get("positions", {})
             if str(position) in positions and positions[str(position)].get("occupied", False):
-                print(f"[LOAD] ℹ Position {position} already occupied, ignoring wrong_placement event")
                 return
 
-        print(f"[LOAD] ✗ Wrong placement! Expected #{expected_position}, got #{position}")
-
+        # Find the active LOAD operation for this drawer
         for op_id, op in list(self.pending_operations.items()):
             if op.get('type') == 'load' and op.get('drawer') == drawer_id and op.get('position') == expected_position:
+                print(f"[LOAD] ✗ Wrong placement! Expected #{expected_position}, got #{position}")
+
+                # Track wrong positions
                 if 'wrong_positions' not in op:
                     op['wrong_positions'] = []
                 if position not in op['wrong_positions']:
                     op['wrong_positions'].append(position)
 
-                # Notify frontend about the error
+                # Notify frontend
                 self.client.publish("winefridge/system/status", json.dumps({
                     "action": "placement_error",
                     "source": "mqtt_handler",
@@ -901,24 +961,20 @@ class WineFridgeController:
                     "timestamp": datetime.now().isoformat()
                 }))
 
-                # Update LEDs: RED SOLID on wrong position(s) + GREEN BLINKING on correct position
-                led_positions = []
-
-                # Add green blinking LED on the expected (correct) position
-                led_positions.append({
+                # Update LEDs: GREEN BLINKING on correct position + RED SOLID on wrong positions
+                led_positions = [{
                     "position": expected_position,
                     "color": "#00FF00",
                     "brightness": 100,
                     "blink": True
-                })
+                }]
 
-                # Add red solid LEDs on all wrong positions
                 for wrong_pos in op['wrong_positions']:
                     led_positions.append({
                         "position": wrong_pos,
                         "color": "#FF0000",
                         "brightness": 100,
-                        "blink": False  # SOLID RED, not blinking
+                        "blink": False
                     })
 
                 self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
@@ -928,8 +984,7 @@ class WineFridgeController:
                     "timestamp": datetime.now().isoformat()
                 }))
 
-                print(f"[LOAD] → LED: Red solid at position {position}, Green blinking at {expected_position}")
-
+                print(f"[LOAD] → LED: Red solid at {position}, Green blinking at {expected_position}")
                 break
 
     def handle_swap_event(self, drawer_id, position, event, weight):
@@ -1220,7 +1275,7 @@ class WineFridgeController:
                 }))
 
     def handle_bottle_placed(self, drawer_id, position, weight):
-        """Handle 'placed' event when not in swap mode"""
+        """Handle 'placed' event during active LOAD operations"""
         op_id, op = self.find_pending_op(drawer_id, position)
 
         if op and op['type'] == 'load':
@@ -1240,43 +1295,38 @@ class WineFridgeController:
                 "timestamp": datetime.now().isoformat()
             }))
 
-            # Turn off all wrong position LEDs immediately (if any)
+            # Turn off all wrong position LEDs (if any) and set correct position to gray
             wrong_positions = op.get('wrong_positions', [])
-            if wrong_positions:
-                print(f"[LOAD] → Clearing red LEDs from wrong positions: {wrong_positions}")
-                # Send command to turn off LEDs at wrong positions
-                led_clear_positions = []
-                for wrong_pos in wrong_positions:
-                    led_clear_positions.append({
-                        "position": wrong_pos,
-                        "color": "#000000",  # Black/off
-                        "brightness": 0
-                    })
+            led_positions = []
 
-                # Also set the correct position to gray
-                led_clear_positions.append({
-                    "position": position,
-                    "color": "#808080",
-                    "brightness": 30
+            # Clear wrong positions
+            for wrong_pos in wrong_positions:
+                led_positions.append({
+                    "position": wrong_pos,
+                    "color": "#000000",
+                    "brightness": 0
                 })
 
-                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                    "action": "set_leds",
-                    "source": "mqtt_handler",
-                    "data": {"positions": led_clear_positions},
-                    "timestamp": datetime.now().isoformat()
-                }))
-            else:
-                # No wrong positions, just set correct position to gray
-                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                    "action": "set_leds",
-                    "source": "mqtt_handler",
-                    "data": {"positions": [{"position": position, "color": "#808080", "brightness": 30}]},
-                    "timestamp": datetime.now().isoformat()
-                }))
+            # Set correct position to gray
+            led_positions.append({
+                "position": position,
+                "color": "#808080",
+                "brightness": 30
+            })
+
+            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                "action": "set_leds",
+                "source": "mqtt_handler",
+                "data": {"positions": led_positions},
+                "timestamp": datetime.now().isoformat()
+            }))
+
+            if wrong_positions:
+                print(f"[LOAD] → Cleared red LEDs from wrong positions: {wrong_positions}")
 
             del self.pending_operations[op_id]
 
+            # Fade out LEDs after 2 seconds
             def fade_out():
                 time.sleep(2)
                 self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
@@ -1287,23 +1337,11 @@ class WineFridgeController:
                 }))
             threading.Thread(target=fade_out).start()
 
-        else:
-            # No active LOAD operation - check if position was already occupied
-            # If so, this is just the ESP32 re-detecting an existing bottle, ignore it
-            if drawer_id in self.inventory.get("drawers", {}):
-                positions = self.inventory["drawers"][drawer_id].get("positions", {})
-                if str(position) in positions and positions[str(position)].get("occupied", False):
-                    print(f"[LOAD] ℹ Position {position} already occupied, ignoring placed event (no active operation)")
-                    return
-
-            # Position was empty but no LOAD operation active - this is unexpected
-            print(f"[WARN] ✗ Unexpected bottle placed at {drawer_id} pos {position} (no active operation)")
-            # Do NOT mark with LED - user might be manually placing bottles outside of LOAD process
-
     def handle_bottle_removed(self, drawer_id, position):
-        """Handle 'removed' event when not in swap mode"""
+        """Handle 'removed' event during active UNLOAD/LOAD operations"""
         op_id, op = self.find_pending_op(drawer_id, position)
 
+        # Case 1: Correct bottle removed during UNLOAD operation
         if op and op['type'] == 'unload':
             print(f"[UNLOAD] ✔ Bottle removed from correct slot")
 
@@ -1321,69 +1359,91 @@ class WineFridgeController:
                 "timestamp": datetime.now().isoformat()
             }))
 
-            # Turn off all wrong position LEDs immediately (if any) for UNLOAD
-            wrong_positions = op.get('wrong_positions', [])
-            if wrong_positions:
-                print(f"[UNLOAD] → Clearing red LEDs from wrong positions: {wrong_positions}")
-                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                    "action": "set_leds",
-                    "source": "mqtt_handler",
-                    "data": {"positions": []},
-                    "timestamp": datetime.now().isoformat()
-                }))
-            else:
-                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                    "action": "set_leds",
-                    "source": "mqtt_handler",
-                    "data": {"positions": []},
-                    "timestamp": datetime.now().isoformat()
-                }))
+            # Turn off all LEDs
+            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                "action": "set_leds",
+                "source": "mqtt_handler",
+                "data": {"positions": []},
+                "timestamp": datetime.now().isoformat()
+            }))
+
+            if op.get('wrong_positions'):
+                print(f"[UNLOAD] → Cleared red LEDs from wrong positions: {op['wrong_positions']}")
 
             del self.pending_operations[op_id]
+            return
 
-        else:
-            # Check if this is a wrong removal during UNLOAD operation
-            wrong_removal = False
-            for existing_op_id, existing_op in self.pending_operations.items():
-                if existing_op['type'] == 'unload' and existing_op['drawer'] == drawer_id:
-                    print(f"[UNLOAD] ✗ Wrong bottle removed! Expected {existing_op['position']}, got {position}")
-                    wrong_removal = True
+        # Case 2: Wrong bottle removed during UNLOAD operation
+        for existing_op_id, existing_op in self.pending_operations.items():
+            if existing_op['type'] == 'unload' and existing_op['drawer'] == drawer_id:
+                print(f"[UNLOAD] ✗ Wrong bottle removed! Expected {existing_op['position']}, got {position}")
 
-                    # Track wrong positions for UNLOAD
-                    if 'wrong_positions' not in existing_op:
-                        existing_op['wrong_positions'] = []
-                    if position not in existing_op['wrong_positions']:
-                        existing_op['wrong_positions'].append(position)
+                # Track wrong positions
+                if 'wrong_positions' not in existing_op:
+                    existing_op['wrong_positions'] = []
+                if position not in existing_op['wrong_positions']:
+                    existing_op['wrong_positions'].append(position)
 
-                    self.client.publish("winefridge/system/status", json.dumps({
-                        "action": "wrong_bottle_removed",
-                        "source": "mqtt_handler",
-                        "data": {
-                            "drawer": drawer_id,
-                            "position": position,
-                            "expected_position": existing_op['position']
-                        },
-                        "timestamp": datetime.now().isoformat()
-                    }))
+                # Notify frontend
+                self.client.publish("winefridge/system/status", json.dumps({
+                    "action": "wrong_bottle_removed",
+                    "source": "mqtt_handler",
+                    "data": {
+                        "drawer": drawer_id,
+                        "position": position,
+                        "expected_position": existing_op['position']
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }))
 
-                    # Update LEDs: RED SOLID on wrong position + GREEN BLINKING on correct position
-                    led_positions = []
+                # Update LEDs: GREEN BLINKING on correct + RED SOLID on wrong positions
+                led_positions = [{
+                    "position": existing_op['position'],
+                    "color": "#00FF00",
+                    "brightness": 100,
+                    "blink": True
+                }]
 
-                    # Add green blinking LED on the expected (correct) position
+                for wrong_pos in existing_op['wrong_positions']:
                     led_positions.append({
+                        "position": wrong_pos,
+                        "color": "#FF0000",
+                        "brightness": 100,
+                        "blink": False
+                    })
+
+                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                    "action": "set_leds",
+                    "source": "mqtt_handler",
+                    "data": {"positions": led_positions},
+                    "timestamp": datetime.now().isoformat()
+                }))
+
+                print(f"[UNLOAD] → LED: Red solid at {position}, Green blinking at {existing_op['position']}")
+                return
+
+        # Case 3: Bottle removed from wrong position during LOAD operation
+        for existing_op_id, existing_op in list(self.pending_operations.items()):
+            if existing_op['type'] == 'load' and existing_op['drawer'] == drawer_id:
+                wrong_positions = existing_op.get('wrong_positions', [])
+                if position in wrong_positions:
+                    print(f"[LOAD] → Bottle removed from wrong position {position}, clearing red LED")
+                    wrong_positions.remove(position)
+
+                    # Update LEDs: GREEN BLINKING on correct + RED SOLID on remaining wrong positions
+                    led_positions = [{
                         "position": existing_op['position'],
                         "color": "#00FF00",
                         "brightness": 100,
                         "blink": True
-                    })
+                    }]
 
-                    # Add red solid LEDs on all wrong positions
-                    for wrong_pos in existing_op['wrong_positions']:
+                    for wrong_pos in wrong_positions:
                         led_positions.append({
                             "position": wrong_pos,
                             "color": "#FF0000",
                             "brightness": 100,
-                            "blink": False  # SOLID RED, not blinking
+                            "blink": False
                         })
 
                     self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
@@ -1392,53 +1452,7 @@ class WineFridgeController:
                         "data": {"positions": led_positions},
                         "timestamp": datetime.now().isoformat()
                     }))
-
-                    print(f"[UNLOAD] → LED: Red solid at position {position}, Green blinking at {existing_op['position']}")
-                    break
-
-            # Check if bottle was removed from a wrong position during LOAD operation
-            if not wrong_removal:
-                for existing_op_id, existing_op in list(self.pending_operations.items()):
-                    if existing_op['type'] == 'load' and existing_op['drawer'] == drawer_id:
-                        wrong_positions = existing_op.get('wrong_positions', [])
-                        if position in wrong_positions:
-                            # Bottle removed from wrong position during LOAD - clear red LED
-                            print(f"[LOAD] → Bottle removed from wrong position {position}, clearing red LED")
-                            wrong_positions.remove(position)
-
-                            # Update LEDs: keep green blinking on correct position, remove red from this position
-                            led_positions = []
-
-                            # Add green blinking LED on the expected (correct) position
-                            led_positions.append({
-                                "position": existing_op['position'],
-                                "color": "#00FF00",
-                                "brightness": 100,
-                                "blink": True
-                            })
-
-                            # Add red solid LEDs on remaining wrong positions (if any)
-                            for wrong_pos in wrong_positions:
-                                led_positions.append({
-                                    "position": wrong_pos,
-                                    "color": "#FF0000",
-                                    "brightness": 100,
-                                    "blink": False
-                                })
-
-                            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                                "action": "set_leds",
-                                "source": "mqtt_handler",
-                                "data": {"positions": led_positions},
-                                "timestamp": datetime.now().isoformat()
-                            }))
-
-                            wrong_removal = True
-                            break
-
-            if not wrong_removal:
-                print(f"[WARN] ✗ Unexpected bottle removed from {drawer_id} pos {position}")
-                self.update_inventory(drawer_id, position, None, None, 0, occupied=False)
+                    return
 
     def find_pending_op(self, drawer_id, position):
         """Find a pending operation matching the event location"""
