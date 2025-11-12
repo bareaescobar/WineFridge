@@ -1,5 +1,5 @@
 /*
- * WineFridge Drawer ESP32_DRAWER7 v6.1.0
+ * WineFridge Drawer ESP32_DRAWER7 v6.2.0
  *
  * BASED ON WORKING v33 PATTERN
  * - NO OTA (conflicts with GPIO 2)
@@ -8,6 +8,7 @@
  * - Detects existing bottles on startup
  * - Tares scale before each LOAD operation
  * - Smart weight measurement: TARE for LOAD, differential for manual
+ * - Fixed: COB initialization resets to brightness=0 for MQTT compatibility
  */
 
 #include <WiFi.h>
@@ -19,7 +20,7 @@
 #include "Adafruit_SHT31.h"
 
 #define DRAWER_ID "drawer_7"
-#define FIRMWARE_VERSION "6.1.0"
+#define FIRMWARE_VERSION "6.2.0"
 
 // WiFi
 #define WIFI_SSID_1 "Solo Spirits"
@@ -182,17 +183,20 @@ void setupCOBLEDs() {
   ledcWrite(COB_COOL_PIN, 0);
   
   Serial.println("[COB] Testing - turning ON for 1 second...");
-  
+
   // Test: Turn on warm at 50%
   ledcWrite(COB_WARM_PIN, 128);
   delay(500);
   ledcWrite(COB_WARM_PIN, 0);
-  
+
   // Test: Turn on cool at 50%
   ledcWrite(COB_COOL_PIN, 128);
   delay(500);
   ledcWrite(COB_COOL_PIN, 0);
-  
+
+  // CRITICAL: Reset to clean state (brightness=0) so subsequent commands work
+  setCOBLighting(4000, 0);
+
   Serial.println("[OK] COB LEDs ready");
 }
 
