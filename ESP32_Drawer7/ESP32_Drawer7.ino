@@ -1,10 +1,14 @@
 /*
- * WineFridge Drawer ESP32_DRAWER7 v5.7.0
- * 
+ * WineFridge Drawer ESP32_DRAWER7 v6.3.0
+ *
  * BASED ON WORKING v33 PATTERN
  * - NO OTA (conflicts with GPIO 2)
  * - COB lights fully working
  * - Uses pinMode + ledcDetach + ledcAttach pattern
+ * - Detects existing bottles on startup
+ * - Tares scale before each LOAD operation
+ * - Smart weight measurement: TARE for LOAD, differential for manual
+ * - Fixed: COB initialization simulates MQTT brightness=0 command after startup
  */
 
 #include <WiFi.h>
@@ -16,7 +20,7 @@
 #include "Adafruit_SHT31.h"
 
 #define DRAWER_ID "drawer_7"
-#define FIRMWARE_VERSION "5.7.0"
+#define FIRMWARE_VERSION "6.3.0"
 
 // WiFi
 #define WIFI_SSID_1 "Solo Spirits"
@@ -69,6 +73,7 @@ struct BottlePosition {
   unsigned long stateTimer;
   float weight;
   uint8_t debounceCount;
+  float weightBeforePlacement;  // Track total weight before this bottle was placed
 };
 
 struct LEDBlinkState {
@@ -125,13 +130,18 @@ void setup() {
   setupLEDs();
   setupCOBLEDs();
   setupSensors();
-  setupNetwork();
-  
+
+  // Initialize all positions as empty first
   for (int i = 0; i < 9; i++) {
     positions[i].state = STATE_EMPTY;
     positions[i].weight = 0.0;
   }
-  
+
+  setupNetwork();
+
+  // Detect existing bottles after network is ready
+  detectExistingBottles();
+
   Serial.println("\n[READY]\n");
 }
 
@@ -173,18 +183,18 @@ void setupCOBLEDs() {
   ledcWrite(COB_COOL_PIN, 0);
   
   Serial.println("[COB] Testing - turning ON for 1 second...");
-  
+
   // Test: Turn on warm at 50%
   ledcWrite(COB_WARM_PIN, 128);
   delay(500);
   ledcWrite(COB_WARM_PIN, 0);
-  
+
   // Test: Turn on cool at 50%
   ledcWrite(COB_COOL_PIN, 128);
   delay(500);
   ledcWrite(COB_COOL_PIN, 0);
-  
-  Serial.println("[OK] COB LEDs ready");
+
+  Serial.println("[OK] COB LEDs ready (will reset via MQTT after connection)");
 }
 
 void setupSensors() {
@@ -350,6 +360,15 @@ void updatePositionStateMachine(uint8_t position) {
           
           pos->state = STATE_WEIGHING;
           pos->stateTimer = millis();
+
+          // Save current total weight before placing bottle (for differential calculation)
+          if (scale.is_ready()) {
+            pos->weightBeforePlacement = scale.get_units(3);
+            Serial.printf("[POS %d] Weight before: %.1fg\n", position + 1, pos->weightBeforePlacement);
+          } else {
+            pos->weightBeforePlacement = 0.0;
+          }
+
           setLED(position + 1, 0x00FF00, 50, true);
           Serial.printf("[POS %d] Weighing...\n", position + 1);
         }
@@ -361,24 +380,37 @@ void updatePositionStateMachine(uint8_t position) {
         pos->state = STATE_EMPTY;
         setLED(position + 1, 0x000000, 0, false);
       } else if (millis() - pos->stateTimer > WEIGHT_STABILIZE_TIME) {
-        float weight = getStableWeight();
-        
-        if (weight > WEIGHT_THRESHOLD) {
-          pos->weight = weight;
-          state.individualWeights[position] = weight;
+        float totalWeightNow = getStableWeight();
+        float individualWeight;
+
+        // If this position is expected (LOAD process), scale was TARED - read total weight directly
+        if (state.expectedPosition == (position + 1)) {
+          individualWeight = totalWeightNow;
+          Serial.printf("[POS %d] LOAD process - Total weight: %.1fg (scale was tared)\n",
+                       position + 1, totalWeightNow);
+        } else {
+          // Manual placement - calculate differential weight
+          individualWeight = totalWeightNow - pos->weightBeforePlacement;
+          Serial.printf("[POS %d] Manual placement - Total: %.1fg, Before: %.1fg, Individual: %.1fg\n",
+                       position + 1, totalWeightNow, pos->weightBeforePlacement, individualWeight);
+        }
+
+        if (individualWeight > WEIGHT_THRESHOLD) {
+          pos->weight = individualWeight;
+          state.individualWeights[position] = individualWeight;
           state.positions[position] = true;
           pos->state = STATE_OCCUPIED;
-          
+
           setLED(position + 1, 0x808080, 30, false);
-          sendBottleEvent(position + 1, true, weight);
-          
-          Serial.printf("[POS %d] ✓ Placed: %.1fg\n", position + 1, weight);
-          
+          sendBottleEvent(position + 1, true, individualWeight);
+
+          Serial.printf("[POS %d] ✓ Placed: %.1fg\n", position + 1, individualWeight);
+
           if (state.expectedPosition == (position + 1)) {
             state.expectedPosition = 0;
           }
         } else {
-          Serial.printf("[POS %d] ✗ Weight too low: %.1fg\n", position + 1, weight);
+          Serial.printf("[POS %d] ✗ Weight too low: %.1fg\n", position + 1, individualWeight);
           pos->state = STATE_EMPTY;
           setLED(position + 1, 0xFF0000, 100, true);
           delay(2000);
@@ -610,6 +642,12 @@ void handleCommand(JsonDocument& doc) {
     uint8_t position = data["position"];
     state.expectedPosition = position;
     Serial.printf("[CMD] Expecting position %d\n", position);
+
+    // Tare the scale so we only measure the new bottle's weight
+    if (scale.is_ready()) {
+      scale.tare();
+      Serial.println("[CMD] ✓ Scale tared - ready to measure new bottle");
+    }
   }
   else if (action == "manual_tare") {
     if (scale.is_ready()) {
@@ -698,11 +736,76 @@ void sendStartupMessage() {
   doc["source"] = DRAWER_ID;
   doc["firmware"] = FIRMWARE_VERSION;
   doc["ip"] = state.ipAddress;
-  
+
   char buffer[256];
   serializeJson(doc, buffer);
   mqttClient.publish(mqtt_topic_status, buffer);
   Serial.println("[MQTT] Startup sent");
+
+  // Simulate receiving brightness=0 message to reset COB lights to clean state
+  // This is necessary after the test sequence in setupCOBLEDs()
+  Serial.println("[INIT] Simulating brightness=0 command to reset COB lights...");
+  StaticJsonDocument<256> cobResetDoc;
+  cobResetDoc["action"] = "set_general_light";
+  JsonObject data = cobResetDoc.createNestedObject("data");
+  data["temperature"] = 4000;
+  data["brightness"] = 0;
+  handleCommand(cobResetDoc);
+}
+
+void detectExistingBottles() {
+  Serial.println("[INIT] Detecting existing bottles...");
+
+  if (!state.weightSensorReady) {
+    Serial.println("[INIT] ✗ Weight sensor not ready, skipping detection");
+    return;
+  }
+
+  delay(1000); // Wait for weight sensor to stabilize after tare
+
+  // Count pressed switches (bottles present)
+  int bottlesPresent = 0;
+  bool switchStates[9];
+
+  for (int i = 0; i < 9; i++) {
+    switchStates[i] = (digitalRead(SWITCH_PINS[i]) == LOW);
+    if (switchStates[i]) {
+      bottlesPresent++;
+    }
+  }
+
+  if (bottlesPresent == 0) {
+    Serial.println("[INIT] No bottles detected");
+    return;
+  }
+
+  // Read total weight
+  float totalWeight = getStableWeight();
+
+  if (totalWeight < (WEIGHT_THRESHOLD * bottlesPresent * 0.5)) {
+    // Weight too low, probably false detection
+    Serial.printf("[INIT] ✗ Weight too low: %.1fg for %d bottles\n", totalWeight, bottlesPresent);
+    return;
+  }
+
+  // Estimate individual weight (simple average)
+  float estimatedWeight = totalWeight / bottlesPresent;
+
+  Serial.printf("[INIT] Found %d bottles, total weight: %.1fg\n", bottlesPresent, totalWeight);
+
+  // Mark positions as occupied
+  for (int i = 0; i < 9; i++) {
+    if (switchStates[i]) {
+      positions[i].state = STATE_OCCUPIED;
+      positions[i].weight = estimatedWeight;
+      state.positions[i] = true;
+      state.individualWeights[i] = estimatedWeight;
+
+      Serial.printf("[INIT] ✓ Position %d occupied (est. %.1fg)\n", i + 1, estimatedWeight);
+    }
+  }
+
+  Serial.println("[INIT] ✓ Detection complete\n");
 }
 
 void maintainConnections() {
@@ -711,7 +814,7 @@ void maintainConnections() {
     WiFi.reconnect();
     return;
   }
-  
+
   if (!mqttClient.connected()) {
     Serial.println("[MQTT] Reconnecting...");
     connectMQTT();
