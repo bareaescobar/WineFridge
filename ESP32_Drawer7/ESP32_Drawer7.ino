@@ -1,10 +1,12 @@
 /*
- * WineFridge Drawer ESP32_DRAWER7 v5.7.0
- * 
+ * WineFridge Drawer ESP32_DRAWER7 v5.9.0
+ *
  * BASED ON WORKING v33 PATTERN
  * - NO OTA (conflicts with GPIO 2)
  * - COB lights fully working
  * - Uses pinMode + ledcDetach + ledcAttach pattern
+ * - Detects existing bottles on startup
+ * - Tares scale before each LOAD operation
  */
 
 #include <WiFi.h>
@@ -16,7 +18,7 @@
 #include "Adafruit_SHT31.h"
 
 #define DRAWER_ID "drawer_7"
-#define FIRMWARE_VERSION "5.7.0"
+#define FIRMWARE_VERSION "5.9.0"
 
 // WiFi
 #define WIFI_SSID_1 "Solo Spirits"
@@ -615,6 +617,12 @@ void handleCommand(JsonDocument& doc) {
     uint8_t position = data["position"];
     state.expectedPosition = position;
     Serial.printf("[CMD] Expecting position %d\n", position);
+
+    // Tare the scale so we only measure the new bottle's weight
+    if (scale.is_ready()) {
+      scale.tare();
+      Serial.println("[CMD] ✓ Scale tared - ready to measure new bottle");
+    }
   }
   else if (action == "manual_tare") {
     if (scale.is_ready()) {
