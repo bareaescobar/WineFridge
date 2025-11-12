@@ -1336,6 +1336,39 @@ class WineFridgeController:
                     "timestamp": datetime.now().isoformat()
                 }))
             threading.Thread(target=fade_out).start()
+            return
+
+        # Case 2: Bottle placed back in wrong position during UNLOAD operation
+        for existing_op_id, existing_op in list(self.pending_operations.items()):
+            if existing_op['type'] == 'unload' and existing_op['drawer'] == drawer_id:
+                wrong_positions = existing_op.get('wrong_positions', [])
+                if position in wrong_positions:
+                    print(f"[UNLOAD] → Bottle placed back in wrong position {position}, clearing red LED")
+                    wrong_positions.remove(position)
+
+                    # Update LEDs: GREEN BLINKING on correct + RED SOLID on remaining wrong positions
+                    led_positions = [{
+                        "position": existing_op['position'],
+                        "color": "#00FF00",
+                        "brightness": 100,
+                        "blink": True
+                    }]
+
+                    for wrong_pos in wrong_positions:
+                        led_positions.append({
+                            "position": wrong_pos,
+                            "color": "#FF0000",
+                            "brightness": 100,
+                            "blink": False
+                        })
+
+                    self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                        "action": "set_leds",
+                        "source": "mqtt_handler",
+                        "data": {"positions": led_positions},
+                        "timestamp": datetime.now().isoformat()
+                    }))
+                    return
 
     def handle_bottle_removed(self, drawer_id, position):
         """Handle 'removed' event during active UNLOAD/LOAD operations"""
@@ -1359,16 +1392,34 @@ class WineFridgeController:
                 "timestamp": datetime.now().isoformat()
             }))
 
-            # Turn off all LEDs
+            # First, explicitly turn off wrong position LEDs (if any)
+            wrong_positions = op.get('wrong_positions', [])
+            led_positions = []
+
+            # Clear wrong positions explicitly with brightness=0
+            for wrong_pos in wrong_positions:
+                led_positions.append({
+                    "position": wrong_pos,
+                    "color": "#000000",
+                    "brightness": 0
+                })
+
+            if led_positions:
+                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                    "action": "set_leds",
+                    "source": "mqtt_handler",
+                    "data": {"positions": led_positions},
+                    "timestamp": datetime.now().isoformat()
+                }))
+                print(f"[UNLOAD] → Cleared red LEDs from wrong positions: {wrong_positions}")
+
+            # Then turn off all LEDs
             self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
                 "data": {"positions": []},
                 "timestamp": datetime.now().isoformat()
             }))
-
-            if op.get('wrong_positions'):
-                print(f"[UNLOAD] → Cleared red LEDs from wrong positions: {op['wrong_positions']}")
 
             del self.pending_operations[op_id]
             return
