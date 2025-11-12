@@ -62,6 +62,15 @@ const modalActions = {
     updateBottleInfoModalWithPosition(pickedProduct, pickedProductPositionDetails, bottleInfoContainer)
   },
   'unload-bottle-welcome-modal': () => {
+    // If coming from error modal, just go back to drawer modal (don't cancel operation)
+    const fromErrorModal = unloadErrorModal?.classList.contains('active')
+    if (fromErrorModal) {
+      console.log('[UNLOAD] User acknowledged error, going back to drawer modal')
+      unloadErrorModal.classList.remove('active')
+      unloadBottleDrawerModal.classList.add('active')
+      return
+    }
+
     // If coming from drawer modal (user pressed back during unload), cancel the unload operation
     const fromDrawerModal = unloadBottleDrawerModal?.classList.contains('active')
     if (fromDrawerModal) {
