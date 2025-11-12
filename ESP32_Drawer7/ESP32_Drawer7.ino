@@ -1,5 +1,5 @@
 /*
- * WineFridge Drawer ESP32_DRAWER7 v6.2.0
+ * WineFridge Drawer ESP32_DRAWER7 v6.3.0
  *
  * BASED ON WORKING v33 PATTERN
  * - NO OTA (conflicts with GPIO 2)
@@ -8,7 +8,7 @@
  * - Detects existing bottles on startup
  * - Tares scale before each LOAD operation
  * - Smart weight measurement: TARE for LOAD, differential for manual
- * - Fixed: COB initialization resets to brightness=0 for MQTT compatibility
+ * - Fixed: COB initialization simulates MQTT brightness=0 command after startup
  */
 
 #include <WiFi.h>
@@ -20,7 +20,7 @@
 #include "Adafruit_SHT31.h"
 
 #define DRAWER_ID "drawer_7"
-#define FIRMWARE_VERSION "6.2.0"
+#define FIRMWARE_VERSION "6.3.0"
 
 // WiFi
 #define WIFI_SSID_1 "Solo Spirits"
@@ -194,10 +194,7 @@ void setupCOBLEDs() {
   delay(500);
   ledcWrite(COB_COOL_PIN, 0);
 
-  // CRITICAL: Reset to clean state (brightness=0) so subsequent commands work
-  setCOBLighting(4000, 0);
-
-  Serial.println("[OK] COB LEDs ready");
+  Serial.println("[OK] COB LEDs ready (will reset via MQTT after connection)");
 }
 
 void setupSensors() {
@@ -739,11 +736,21 @@ void sendStartupMessage() {
   doc["source"] = DRAWER_ID;
   doc["firmware"] = FIRMWARE_VERSION;
   doc["ip"] = state.ipAddress;
-  
+
   char buffer[256];
   serializeJson(doc, buffer);
   mqttClient.publish(mqtt_topic_status, buffer);
   Serial.println("[MQTT] Startup sent");
+
+  // Simulate receiving brightness=0 message to reset COB lights to clean state
+  // This is necessary after the test sequence in setupCOBLEDs()
+  Serial.println("[INIT] Simulating brightness=0 command to reset COB lights...");
+  StaticJsonDocument<256> cobResetDoc;
+  cobResetDoc["action"] = "set_general_light";
+  JsonObject data = cobResetDoc.createNestedObject("data");
+  data["temperature"] = 4000;
+  data["brightness"] = 0;
+  handleCommand(cobResetDoc);
 }
 
 void detectExistingBottles() {
