@@ -106,6 +106,20 @@ const mqttActions = {
       // Fallback to alert for other errors
       alert(`⚠️ Swap Error\n\n${data.error || 'Unknown error'}`)
     }
+  },
+
+  swap_timeout(data) {
+    console.log('[SWAP] Timeout - returning to home')
+    // Close all modals
+    swapBottlesModal.classList.remove('active')
+    swapBottlesSuccessModal.classList.remove('active')
+    swapErrorModal.classList.remove('active')
+    resetScene()
+
+    // Redirect to home after a brief delay
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 100)
   }
 }
 

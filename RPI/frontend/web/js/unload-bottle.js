@@ -180,6 +180,23 @@ const mqttActions = {
     console.log('[UNLOAD] Error detected:', data)
     alert(`⚠️ Unload Error\n\n${data.error || 'Unknown error'}`)
   },
+
+  unload_timeout(data) {
+    console.log('[UNLOAD] Timeout - returning to home')
+    // Close all modals
+    unloadBottleSuggestModal.classList.remove('active')
+    unloadBottleManuallyModal.classList.remove('active')
+    unloadBottleInfoModal.classList.remove('active')
+    unloadBottleDrawerModal.classList.remove('active')
+    mealRecommendModal.classList.remove('active')
+    unloadBottleSuccessModal.classList.remove('active')
+    unloadErrorModal.classList.remove('active')
+
+    // Redirect to home after a brief delay
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 100)
+  },
 }
 
 connectMQTT({

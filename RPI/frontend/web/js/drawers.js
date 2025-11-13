@@ -140,10 +140,16 @@ const mqttActions = {
   },
 
   unload_timeout(data) {
-    console.log('[DRAWERS] Unload timeout:', data)
-    // Close the modal and return to drawer view
+    console.log('[DRAWERS] Unload timeout - returning to home')
+    // Close all modals
     takeWineModal.classList.remove('active')
-    alert('⚠️ Unload Timeout\n\nThe operation timed out. Please try again.')
+    takeWineSuccessModal.classList.remove('active')
+    unloadErrorModal.classList.remove('active')
+
+    // Redirect to home after a brief delay
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 100)
   },
 }
 
