@@ -1012,36 +1012,57 @@ class WineFridgeController:
                     "timestamp": datetime.now().isoformat()
                 }))
 
-                # Actualizar LEDs: SOLO verde parpadeando en posiciones correctas, SIN amarillo en esta posición
-                expected_positions = [t['target_position'] for t in self.swap_operations['bottles_to_place'] if t['target_drawer'] == drawer_id]
-                led_positions = []
+                # Actualizar LEDs: verde parpadeando en PRIMERA posición, amarillo en SEGUNDA
+                target_1 = self.swap_operations['bottles_to_place'][0]
+                target_2 = self.swap_operations['bottles_to_place'][1]
 
-                # LED verde parpadeando en posiciones esperadas
-                for exp_pos in expected_positions:
-                    led_positions.append({
-                        "position": exp_pos,
-                        "color": "#00FF00",
-                        "brightness": 100,
-                        "blink": True
-                    })
+                # LEDs rojos en posiciones incorrectas restantes
+                remaining_wrong = [wp for wp in wrong_positions if wp['drawer'] == drawer_id]
 
-                # LED rojo en posiciones incorrectas restantes (si hay más de una incorrecta)
-                for wrong_pos in wrong_positions:
-                    if wrong_pos['drawer'] == drawer_id:
+                # Construir comando LED para cada drawer
+                drawers_to_update = set([target_1['target_drawer'], target_2['target_drawer']])
+                if remaining_wrong:
+                    drawers_to_update.add(drawer_id)
+
+                for update_drawer in drawers_to_update:
+                    led_positions = []
+
+                    # LED verde parpadeando en primera posición
+                    if target_1['target_drawer'] == update_drawer:
                         led_positions.append({
-                            "position": wrong_pos['position'],
-                            "color": "#FF0000",
+                            "position": target_1['target_position'],
+                            "color": "#00FF00",
                             "brightness": 100,
-                            "blink": False
+                            "blink": True
                         })
 
-                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                    "action": "set_leds",
-                    "source": "mqtt_handler",
-                    "data": {"positions": led_positions},
-                    "timestamp": datetime.now().isoformat()
-                }))
-                print(f"[SWAP] → LED: Only green blinking at {expected_positions}, NO yellow at {position}")
+                    # LED amarillo en segunda posición
+                    if target_2['target_drawer'] == update_drawer:
+                        led_positions.append({
+                            "position": target_2['target_position'],
+                            "color": "#FFFF00",
+                            "brightness": 100
+                        })
+
+                    # LEDs rojos en posiciones incorrectas
+                    for wrong_pos in remaining_wrong:
+                        if wrong_pos['drawer'] == update_drawer:
+                            led_positions.append({
+                                "position": wrong_pos['position'],
+                                "color": "#FF0000",
+                                "brightness": 100,
+                                "blink": False
+                            })
+
+                    if led_positions:
+                        self.client.publish(f"winefridge/{update_drawer}/command", json.dumps({
+                            "action": "set_leds",
+                            "source": "mqtt_handler",
+                            "data": {"positions": led_positions},
+                            "timestamp": datetime.now().isoformat()
+                        }))
+
+                print(f"[SWAP] → LED: Green blinking at {target_1['target_drawer']}:{target_1['target_position']}, Yellow at {target_2['target_drawer']}:{target_2['target_position']}")
                 return  # Salir temprano, no procesar como botella del inventario
 
             # Si no es posición incorrecta, procesar como botella del inventario
@@ -1183,27 +1204,39 @@ class WineFridgeController:
 
                 self.swap_operations['bottles_to_place'].pop(target_idx)
 
-                # LED gris en posición correcta
-                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                    "action": "set_leds",
-                    "source": "mqtt_handler",
-                    "data": {"positions": [{"position": position, "color": "#808080", "brightness": 30}]},
-                    "timestamp": datetime.now().isoformat()
-                }))
-
                 if len(self.swap_operations['bottles_to_place']) == 1:
-                    # Queda 1 botella por colocar, LED verde parpadeando
+                    # Queda 1 botella por colocar
                     remaining_target = self.swap_operations['bottles_to_place'][0]
                     print(f"[SWAP] Ready for final placement: {remaining_target['bottle']['name'][:40]}")
 
-                    self.client.publish(f"winefridge/{remaining_target['target_drawer']}/command", json.dumps({
-                        "action": "set_leds",
-                        "source": "mqtt_handler",
-                        "data": {"positions": [
-                            {"position": remaining_target['target_position'], "color": "#00FF00", "brightness": 100, "blink": True}
-                        ]},
-                        "timestamp": datetime.now().isoformat()
-                    }))
+                    # Construir comando LED completo para cada drawer
+                    if drawer_id == remaining_target['target_drawer']:
+                        # Ambas posiciones en el mismo drawer: gris + verde parpadeando
+                        self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                            "action": "set_leds",
+                            "source": "mqtt_handler",
+                            "data": {"positions": [
+                                {"position": position, "color": "#808080", "brightness": 30},
+                                {"position": remaining_target['target_position'], "color": "#00FF00", "brightness": 100, "blink": True}
+                            ]},
+                            "timestamp": datetime.now().isoformat()
+                        }))
+                    else:
+                        # Posiciones en drawers diferentes
+                        self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                            "action": "set_leds",
+                            "source": "mqtt_handler",
+                            "data": {"positions": [{"position": position, "color": "#808080", "brightness": 30}]},
+                            "timestamp": datetime.now().isoformat()
+                        }))
+                        self.client.publish(f"winefridge/{remaining_target['target_drawer']}/command", json.dumps({
+                            "action": "set_leds",
+                            "source": "mqtt_handler",
+                            "data": {"positions": [
+                                {"position": remaining_target['target_position'], "color": "#00FF00", "brightness": 100, "blink": True}
+                            ]},
+                            "timestamp": datetime.now().isoformat()
+                        }))
 
                 elif len(self.swap_operations['bottles_to_place']) == 0:
                     # Swap completado
@@ -1212,6 +1245,41 @@ class WineFridgeController:
                     # Cancelar timer
                     if 'timer' in self.swap_operations and self.swap_operations['timer']:
                         self.swap_operations['timer'].cancel()
+
+                    # Guardar información de las botellas antes de resetear
+                    bottle1 = self.swap_operations['bottles_removed'][0]
+                    bottle2 = self.swap_operations['bottles_removed'][1]
+
+                    # Obtener las posiciones finales (intercambiadas)
+                    final_pos_1 = {'drawer': bottle2['drawer'], 'position': bottle2['position']}
+                    final_pos_2 = {'drawer': bottle1['drawer'], 'position': bottle1['position']}
+
+                    # Enviar LEDs grises en ambas posiciones momentáneamente
+                    if final_pos_1['drawer'] == final_pos_2['drawer']:
+                        # Mismo drawer: enviar ambos LEDs grises juntos
+                        self.client.publish(f"winefridge/{final_pos_1['drawer']}/command", json.dumps({
+                            "action": "set_leds",
+                            "source": "mqtt_handler",
+                            "data": {"positions": [
+                                {"position": final_pos_1['position'], "color": "#808080", "brightness": 30},
+                                {"position": final_pos_2['position'], "color": "#808080", "brightness": 30}
+                            ]},
+                            "timestamp": datetime.now().isoformat()
+                        }))
+                    else:
+                        # Drawers diferentes: enviar a cada uno
+                        self.client.publish(f"winefridge/{final_pos_1['drawer']}/command", json.dumps({
+                            "action": "set_leds",
+                            "source": "mqtt_handler",
+                            "data": {"positions": [{"position": final_pos_1['position'], "color": "#808080", "brightness": 30}]},
+                            "timestamp": datetime.now().isoformat()
+                        }))
+                        self.client.publish(f"winefridge/{final_pos_2['drawer']}/command", json.dumps({
+                            "action": "set_leds",
+                            "source": "mqtt_handler",
+                            "data": {"positions": [{"position": final_pos_2['position'], "color": "#808080", "brightness": 30}]},
+                            "timestamp": datetime.now().isoformat()
+                        }))
 
                     self.client.publish("winefridge/system/status", json.dumps({
                         "action": "swap_completed",
@@ -1222,15 +1290,18 @@ class WineFridgeController:
 
                     self.swap_operations = {'active': False, 'bottles_removed': [], 'bottles_to_place': [], 'start_time': None}
 
-                    def turn_off_led():
+                    # Apagar LEDs de ambos drawers después de 1 segundo
+                    def turn_off_leds():
                         time.sleep(1)
-                        self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                            "action": "set_leds",
-                            "source": "mqtt_handler",
-                            "data": {"positions": []},
-                            "timestamp": datetime.now().isoformat()
-                        }))
-                    threading.Thread(target=turn_off_led).start()
+                        drawers_to_clear = set([final_pos_1['drawer'], final_pos_2['drawer']])
+                        for drawer in drawers_to_clear:
+                            self.client.publish(f"winefridge/{drawer}/command", json.dumps({
+                                "action": "set_leds",
+                                "source": "mqtt_handler",
+                                "data": {"positions": []},
+                                "timestamp": datetime.now().isoformat()
+                            }))
+                    threading.Thread(target=turn_off_leds).start()
             else:
                 # Colocación incorrecta - detectar posiciones esperadas
                 expected_positions = [t['target_position'] for t in self.swap_operations['bottles_to_place'] if t['target_drawer'] == drawer_id]
