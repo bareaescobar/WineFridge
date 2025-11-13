@@ -1178,7 +1178,7 @@ class WineFridgeController:
                     break
 
             if target_info:
-                # Colocación correcta
+                # Colocación correcta - usar peso original del inventario, NO pesar de nuevo
                 print(f"[SWAP] ✔ Placed: {target_info['bottle']['name'][:40]} in correct position")
 
                 # Limpiar LEDs rojos de posiciones incorrectas si había
@@ -1194,12 +1194,16 @@ class WineFridgeController:
                         }))
                     self.swap_operations['wrong_positions'] = []
 
+                # Actualizar inventario con peso ORIGINAL de la botella (no pesar de nuevo)
+                original_weight = target_info['bottle']['weight']
+                print(f"[SWAP] → Using original weight from inventory: {original_weight}g (not re-weighing)")
+
                 self.update_inventory(
                     drawer_id,
                     position,
                     target_info['bottle']['barcode'],
                     target_info['bottle']['name'],
-                    weight
+                    original_weight  # Usar peso original, no el peso medido
                 )
 
                 self.swap_operations['bottles_to_place'].pop(target_idx)
