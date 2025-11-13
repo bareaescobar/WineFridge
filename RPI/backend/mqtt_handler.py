@@ -1190,6 +1190,24 @@ class WineFridgeController:
                     if wrong_pos_info not in self.swap_operations['wrong_positions']:
                         self.swap_operations['wrong_positions'].append(wrong_pos_info)
 
+                    # IMPORTANT: Update inventory temporarily so 'removed' event can be detected later
+                    # Find which bottle was placed incorrectly (the one with highest weight from bottles_to_place)
+                    bottle_to_place = None
+                    for target in self.swap_operations['bottles_to_place']:
+                        if target['target_drawer'] == drawer_id:
+                            bottle_to_place = target['bottle']
+                            break
+
+                    if bottle_to_place:
+                        self.update_inventory(
+                            drawer_id,
+                            position,
+                            bottle_to_place['barcode'],
+                            bottle_to_place['name'],
+                            weight
+                        )
+                        print(f"[SWAP] → Temporarily updated inventory at {drawer_id} pos {position}")
+
                     # Notificar frontend
                     self.client.publish("winefridge/system/status", json.dumps({
                         "action": "swap_error",
@@ -1243,6 +1261,10 @@ class WineFridgeController:
                 # Botella levantada de posición incorrecta - limpiar LED rojo
                 print(f"[SWAP] → Bottle removed from wrong position {position}, clearing red LED")
                 wrong_positions.remove(wrong_pos_info)
+
+                # Clear inventory for this wrong position (was temporarily set)
+                self.update_inventory(drawer_id, position, None, None, 0, occupied=False)
+                print(f"[SWAP] → Cleared inventory at {drawer_id} pos {position}")
 
                 # Notify frontend to close error modal
                 self.client.publish("winefridge/system/status", json.dumps({
