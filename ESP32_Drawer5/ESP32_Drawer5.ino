@@ -654,15 +654,35 @@ void handleCommand(JsonDocument& doc) {
 
   if (action == "set_leds") {
     JsonArray positions = data["positions"];
-    for (JsonObject pos : positions) {
-      uint8_t position = pos["position"];
-      String colorStr = pos["color"];
-      uint8_t brightness = pos["brightness"];
-      bool blink = pos["blink"] | false;  // Default false
 
-      if (position >= 1 && position <= 9) {
-        uint32_t color = strtol(colorStr.c_str() + 1, NULL, 16);
-        setPositionLED(position, color, brightness, blink);
+    // If empty array, turn off ALL LEDs and disable all blink states
+    if (positions.size() == 0) {
+      Serial.println("[LED] Clearing ALL LEDs");
+      for (int i = 0; i < 9; i++) {
+        ledBlinkStates[i].enabled = false;
+        uint8_t ledIndex = bottleToLed[i];
+        strip.setPixelColor(ledIndex, 0);
+      }
+      strip.show();
+    } else {
+      // Clear all LEDs first before setting new ones
+      for (int i = 0; i < 9; i++) {
+        ledBlinkStates[i].enabled = false;
+        uint8_t ledIndex = bottleToLed[i];
+        strip.setPixelColor(ledIndex, 0);
+      }
+
+      // Set the specified LEDs
+      for (JsonObject pos : positions) {
+        uint8_t position = pos["position"];
+        String colorStr = pos["color"];
+        uint8_t brightness = pos["brightness"];
+        bool blink = pos["blink"] | false;  // Default false
+
+        if (position >= 1 && position <= 9) {
+          uint32_t color = strtol(colorStr.c_str() + 1, NULL, 16);
+          setPositionLED(position, color, brightness, blink);
+        }
       }
     }
   }
