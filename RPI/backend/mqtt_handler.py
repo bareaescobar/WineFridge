@@ -1244,6 +1244,17 @@ class WineFridgeController:
                 print(f"[SWAP] → Bottle removed from wrong position {position}, clearing red LED")
                 wrong_positions.remove(wrong_pos_info)
 
+                # Notify frontend to close error modal
+                self.client.publish("winefridge/system/status", json.dumps({
+                    "action": "wrong_swap_bottle_removed",
+                    "source": "mqtt_handler",
+                    "data": {
+                        "drawer": drawer_id,
+                        "position": position
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }))
+
                 # Actualizar LEDs: mantener verde parpadeando en posiciones correctas, quitar rojo de esta posición
                 expected_positions = [t['target_position'] for t in self.swap_operations['bottles_to_place'] if t['target_drawer'] == drawer_id]
                 led_positions = []
