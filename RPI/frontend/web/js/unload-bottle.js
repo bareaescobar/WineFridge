@@ -167,6 +167,14 @@ const mqttActions = {
     }
   },
 
+  // Handle wrong bottle placed back during unload
+  wrong_bottle_replaced(data) {
+    console.log('[UNLOAD] Wrong bottle placed back:', data)
+    // Close error modal and show drawer modal again
+    unloadErrorModal.classList.remove('active')
+    unloadBottleDrawerModal.classList.add('active')
+  },
+
   // Handle other unload errors (kept for compatibility)
   unload_error(data) {
     console.log('[UNLOAD] Error detected:', data)

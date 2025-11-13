@@ -132,6 +132,13 @@ const mqttActions = {
     unloadErrorModal.classList.add('active')
   },
 
+  wrong_bottle_replaced(data) {
+    console.log('[DRAWERS] Wrong bottle placed back:', data)
+    // Close error modal and show drawer modal again
+    unloadErrorModal.classList.remove('active')
+    takeWineModal.classList.add('active')
+  },
+
   unload_timeout(data) {
     console.log('[DRAWERS] Unload timeout:', data)
     // Close the modal and return to drawer view

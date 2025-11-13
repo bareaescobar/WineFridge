@@ -1346,7 +1346,18 @@ class WineFridgeController:
                     print(f"[UNLOAD] → Bottle placed back in wrong position {position}, clearing red LED")
                     wrong_positions.remove(position)
 
-                    # Update LEDs: GREEN BLINKING on correct + RED SOLID on remaining wrong positions
+                    # Notify frontend to close error modal
+                    self.client.publish("winefridge/system/status", json.dumps({
+                        "action": "wrong_bottle_replaced",
+                        "source": "mqtt_handler",
+                        "data": {
+                            "drawer": drawer_id,
+                            "position": position
+                        },
+                        "timestamp": datetime.now().isoformat()
+                    }))
+
+                    # Update LEDs: GREEN BLINKING on correct + GRAY on replaced + RED SOLID on remaining wrong positions
                     led_positions = [{
                         "position": existing_op['position'],
                         "color": "#00FF00",
@@ -1354,6 +1365,15 @@ class WineFridgeController:
                         "blink": True
                     }]
 
+                    # Set gray LED on the position where bottle was placed back
+                    led_positions.append({
+                        "position": position,
+                        "color": "#808080",
+                        "brightness": 30,
+                        "blink": False
+                    })
+
+                    # Red LEDs on remaining wrong positions
                     for wrong_pos in wrong_positions:
                         led_positions.append({
                             "position": wrong_pos,
