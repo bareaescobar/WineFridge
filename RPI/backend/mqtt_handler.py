@@ -990,6 +990,61 @@ class WineFridgeController:
     def handle_swap_event(self, drawer_id, position, event, weight):
         """Handle events during swap operation"""
         if event == 'removed':
+            # Primero verificar si es una posición incorrecta registrada
+            wrong_positions = self.swap_operations.get('wrong_positions', [])
+            wrong_pos_info = next((wp for wp in wrong_positions if wp['drawer'] == drawer_id and wp['position'] == position), None)
+
+            if wrong_pos_info and len(self.swap_operations['bottles_to_place']) > 0:
+                # Botella levantada de posición incorrecta - limpiar LED rojo
+                print(f"[SWAP] → Bottle removed from wrong position {position}, clearing red LED")
+                wrong_positions.remove(wrong_pos_info)
+
+                # NO ACTUALIZAR INVENTARIO - nunca fue actualizado al colocar incorrectamente
+
+                # Notify frontend to close error modal
+                self.client.publish("winefridge/system/status", json.dumps({
+                    "action": "wrong_swap_bottle_removed",
+                    "source": "mqtt_handler",
+                    "data": {
+                        "drawer": drawer_id,
+                        "position": position
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }))
+
+                # Actualizar LEDs: SOLO verde parpadeando en posiciones correctas, SIN amarillo en esta posición
+                expected_positions = [t['target_position'] for t in self.swap_operations['bottles_to_place'] if t['target_drawer'] == drawer_id]
+                led_positions = []
+
+                # LED verde parpadeando en posiciones esperadas
+                for exp_pos in expected_positions:
+                    led_positions.append({
+                        "position": exp_pos,
+                        "color": "#00FF00",
+                        "brightness": 100,
+                        "blink": True
+                    })
+
+                # LED rojo en posiciones incorrectas restantes (si hay más de una incorrecta)
+                for wrong_pos in wrong_positions:
+                    if wrong_pos['drawer'] == drawer_id:
+                        led_positions.append({
+                            "position": wrong_pos['position'],
+                            "color": "#FF0000",
+                            "brightness": 100,
+                            "blink": False
+                        })
+
+                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                    "action": "set_leds",
+                    "source": "mqtt_handler",
+                    "data": {"positions": led_positions},
+                    "timestamp": datetime.now().isoformat()
+                }))
+                print(f"[SWAP] → LED: Only green blinking at {expected_positions}, NO yellow at {position}")
+                return  # Salir temprano, no procesar como botella del inventario
+
+            # Si no es posición incorrecta, procesar como botella del inventario
             bottle_info = None
             if drawer_id in self.inventory.get("drawers", {}):
                 pos_data = self.inventory["drawers"][drawer_id].get("positions", {}).get(str(position))
@@ -1049,9 +1104,8 @@ class WineFridgeController:
                             print("[SWAP] ⏱ Timeout! Cancelling swap operation")
                             self.cancel_swap()
                             self.client.publish("winefridge/system/status", json.dumps({
-                                "action": "swap_completed",
+                                "action": "swap_timeout",
                                 "source": "mqtt_handler",
-                                "data": {"success": False, "close_screen": True},
                                 "timestamp": datetime.now().isoformat()
                             }))
 
@@ -1236,71 +1290,6 @@ class WineFridgeController:
                     }))
 
                     print(f"[SWAP] → LED: Red solid at position {position}, Green blinking at {expected_positions}")
-
-        # También detectar si se levanta de una posición incorrecta (peso bajo)
-        elif event == 'removed' or (event == 'placed' and weight < 50):
-            # Verificar si coincide con alguna posición incorrecta registrada
-            wrong_positions = self.swap_operations.get('wrong_positions', [])
-            wrong_pos_info = None
-
-            # Si es 'removed', buscar por drawer/position
-            if event == 'removed':
-                wrong_pos_info = next((wp for wp in wrong_positions if wp['drawer'] == drawer_id and wp['position'] == position), None)
-            # Si es 'placed' con peso bajo, verificar si había una botella registrada ahí
-            elif event == 'placed' and weight < 50:
-                for wp in wrong_positions:
-                    if wp['drawer'] == drawer_id and wp['position'] == position and wp.get('weight', 0) > 50:
-                        wrong_pos_info = wp
-                        break
-
-            if wrong_pos_info and len(self.swap_operations['bottles_to_place']) > 0:
-                # Botella levantada de posición incorrecta - limpiar LED rojo
-                print(f"[SWAP] → Bottle removed from wrong position {position}, clearing red LED")
-                wrong_positions.remove(wrong_pos_info)
-
-                # NO ACTUALIZAR INVENTARIO - nunca fue actualizado al colocar incorrectamente
-
-                # Notify frontend to close error modal
-                self.client.publish("winefridge/system/status", json.dumps({
-                    "action": "wrong_swap_bottle_removed",
-                    "source": "mqtt_handler",
-                    "data": {
-                        "drawer": drawer_id,
-                        "position": position
-                    },
-                    "timestamp": datetime.now().isoformat()
-                }))
-
-                # Actualizar LEDs: SOLO verde parpadeando en posiciones correctas, SIN amarillo en esta posición
-                expected_positions = [t['target_position'] for t in self.swap_operations['bottles_to_place'] if t['target_drawer'] == drawer_id]
-                led_positions = []
-
-                # LED verde parpadeando en posiciones esperadas
-                for exp_pos in expected_positions:
-                    led_positions.append({
-                        "position": exp_pos,
-                        "color": "#00FF00",
-                        "brightness": 100,
-                        "blink": True
-                    })
-
-                # LED rojo en posiciones incorrectas restantes (si hay más de una incorrecta)
-                for wrong_pos in wrong_positions:
-                    if wrong_pos['drawer'] == drawer_id:
-                        led_positions.append({
-                            "position": wrong_pos['position'],
-                            "color": "#FF0000",
-                            "brightness": 100,
-                            "blink": False
-                        })
-
-                self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                    "action": "set_leds",
-                    "source": "mqtt_handler",
-                    "data": {"positions": led_positions},
-                    "timestamp": datetime.now().isoformat()
-                }))
-                print(f"[SWAP] → LED: Only green blinking at {expected_positions}, NO yellow at {position}")
 
     def handle_bottle_placed(self, drawer_id, position, weight):
         """Handle 'placed' event during active LOAD operations"""
