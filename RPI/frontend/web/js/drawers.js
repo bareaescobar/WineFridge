@@ -108,9 +108,26 @@ function init() {
 }
 
 const mqttActions = {
+  expect_removal() {
+    // Modal is already showing, just waiting for bottle removal
+    console.log('[DRAWERS] Waiting for bottle removal...')
+  },
+
   bottle_unloaded() {
     takeWineModal.classList.remove('active')
     takeWineSuccessModal.classList.add('active')
+  },
+
+  wrong_bottle_removed(data) {
+    console.log('[DRAWERS] Wrong bottle removed:', data)
+    alert(`⚠️ Wrong Bottle Removed\n\nYou removed position ${data.position}.\nPlease remove position ${data.expected_position} instead.\n\nLEDs show: RED = wrong, GREEN = correct`)
+  },
+
+  unload_timeout(data) {
+    console.log('[DRAWERS] Unload timeout:', data)
+    // Close the modal and return to drawer view
+    takeWineModal.classList.remove('active')
+    alert('⚠️ Unload Timeout\n\nThe operation timed out. Please try again.')
   },
 }
 
