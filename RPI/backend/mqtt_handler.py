@@ -1183,30 +1183,15 @@ class WineFridgeController:
                 if expected_positions:
                     print(f"[SWAP] ✗ Wrong placement! Expected positions: {expected_positions}, got {position}")
 
-                    # Registrar posición incorrecta
-                    wrong_pos_info = {'drawer': drawer_id, 'position': position}
+                    # Registrar posición incorrecta CON EL PESO (para detectar 'removed' después)
+                    wrong_pos_info = {'drawer': drawer_id, 'position': position, 'weight': weight}
                     if 'wrong_positions' not in self.swap_operations:
                         self.swap_operations['wrong_positions'] = []
-                    if wrong_pos_info not in self.swap_operations['wrong_positions']:
+                    if not any(wp['drawer'] == drawer_id and wp['position'] == position for wp in self.swap_operations['wrong_positions']):
                         self.swap_operations['wrong_positions'].append(wrong_pos_info)
 
-                    # IMPORTANT: Update inventory temporarily so 'removed' event can be detected later
-                    # Find which bottle was placed incorrectly (the one with highest weight from bottles_to_place)
-                    bottle_to_place = None
-                    for target in self.swap_operations['bottles_to_place']:
-                        if target['target_drawer'] == drawer_id:
-                            bottle_to_place = target['bottle']
-                            break
-
-                    if bottle_to_place:
-                        self.update_inventory(
-                            drawer_id,
-                            position,
-                            bottle_to_place['barcode'],
-                            bottle_to_place['name'],
-                            weight
-                        )
-                        print(f"[SWAP] → Temporarily updated inventory at {drawer_id} pos {position}")
+                    # NO ACTUALIZAR INVENTARIO - solo registrar en memoria
+                    print(f"[SWAP] → Registered wrong position {drawer_id} pos {position} (weight: {weight}g) WITHOUT updating inventory")
 
                     # Notificar frontend
                     self.client.publish("winefridge/system/status", json.dumps({
@@ -1252,19 +1237,28 @@ class WineFridgeController:
 
                     print(f"[SWAP] → LED: Red solid at position {position}, Green blinking at {expected_positions}")
 
-        elif event == 'removed' and len(self.swap_operations['bottles_to_place']) > 0:
-            # Botella levantada durante swap - verificar si es de posición incorrecta
+        # También detectar si se levanta de una posición incorrecta (peso bajo)
+        elif event == 'removed' or (event == 'placed' and weight < 50):
+            # Verificar si coincide con alguna posición incorrecta registrada
             wrong_positions = self.swap_operations.get('wrong_positions', [])
-            wrong_pos_info = next((wp for wp in wrong_positions if wp['drawer'] == drawer_id and wp['position'] == position), None)
+            wrong_pos_info = None
 
-            if wrong_pos_info:
+            # Si es 'removed', buscar por drawer/position
+            if event == 'removed':
+                wrong_pos_info = next((wp for wp in wrong_positions if wp['drawer'] == drawer_id and wp['position'] == position), None)
+            # Si es 'placed' con peso bajo, verificar si había una botella registrada ahí
+            elif event == 'placed' and weight < 50:
+                for wp in wrong_positions:
+                    if wp['drawer'] == drawer_id and wp['position'] == position and wp.get('weight', 0) > 50:
+                        wrong_pos_info = wp
+                        break
+
+            if wrong_pos_info and len(self.swap_operations['bottles_to_place']) > 0:
                 # Botella levantada de posición incorrecta - limpiar LED rojo
                 print(f"[SWAP] → Bottle removed from wrong position {position}, clearing red LED")
                 wrong_positions.remove(wrong_pos_info)
 
-                # Clear inventory for this wrong position (was temporarily set)
-                self.update_inventory(drawer_id, position, None, None, 0, occupied=False)
-                print(f"[SWAP] → Cleared inventory at {drawer_id} pos {position}")
+                # NO ACTUALIZAR INVENTARIO - nunca fue actualizado al colocar incorrectamente
 
                 # Notify frontend to close error modal
                 self.client.publish("winefridge/system/status", json.dumps({
@@ -1277,7 +1271,7 @@ class WineFridgeController:
                     "timestamp": datetime.now().isoformat()
                 }))
 
-                # Actualizar LEDs: mantener verde parpadeando en posiciones correctas, quitar rojo de esta posición
+                # Actualizar LEDs: SOLO verde parpadeando en posiciones correctas, SIN amarillo en esta posición
                 expected_positions = [t['target_position'] for t in self.swap_operations['bottles_to_place'] if t['target_drawer'] == drawer_id]
                 led_positions = []
 
@@ -1290,7 +1284,7 @@ class WineFridgeController:
                         "blink": True
                     })
 
-                # LED rojo en posiciones incorrectas restantes
+                # LED rojo en posiciones incorrectas restantes (si hay más de una incorrecta)
                 for wrong_pos in wrong_positions:
                     if wrong_pos['drawer'] == drawer_id:
                         led_positions.append({
@@ -1306,6 +1300,7 @@ class WineFridgeController:
                     "data": {"positions": led_positions},
                     "timestamp": datetime.now().isoformat()
                 }))
+                print(f"[SWAP] → LED: Only green blinking at {expected_positions}, NO yellow at {position}")
 
     def handle_bottle_placed(self, drawer_id, position, weight):
         """Handle 'placed' event during active LOAD operations"""
