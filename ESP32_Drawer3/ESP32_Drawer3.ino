@@ -1,13 +1,14 @@
 /*
- * WineFridge Drawer ESP32_DRAWER3 v5.3.0
- * FULL firmware corregido para OTA estable
+ * WineFridge Drawer ESP32_DRAWER3 v6.3.0
  *
- * Cambios clave respecto v5.3.0:
- *  - Watchdog aumentado a 75s
- *  - Protecciones OTA: no ejecutar tareas bloqueantes durante OTA
- *  - Llamada única a ArduinoOTA.handle() en loop
- *  - Buffer MQTT reducido a 1024
- *  - WiFi sleep activado durante OTA start, restaurado en end
+ * BASED ON WORKING v33 PATTERN
+ * - NO OTA (conflicts with GPIO 2)
+ * - COB lights fully working
+ * - Uses pinMode + ledcDetach + ledcAttach pattern
+ * - Detects existing bottles on startup
+ * - Tares scale before each LOAD operation
+ * - Smart weight measurement: TARE for LOAD, differential for manual
+ * - Fixed: COB initialization simulates MQTT brightness=0 command after startup
  */
 
 #include <WiFi.h>
@@ -16,14 +17,12 @@
 #include <ArduinoJson.h>
 #include <HX711.h>
 #include <Wire.h>
-#include <ArduinoOTA.h>
 #include "Adafruit_SHT31.h"
-#include "esp_task_wdt.h"
 
 #define DRAWER_ID "drawer_3"
-#define FIRMWARE_VERSION "5.3.0"
+#define FIRMWARE_VERSION "6.3.0"
 
-// Dual WiFi
+// WiFi
 #define WIFI_SSID_1 "Solo Spirits"
 #define WIFI_PASSWORD_1 "Haveadrink"
 #define WIFI_SSID_2 "MOVISTAR-WIFI6-65F8"
@@ -34,8 +33,7 @@
 
 #define HEARTBEAT_INTERVAL 60000
 #define DEBOUNCE_TIME 50
-#define WEIGHT_STABILIZE_TIME 1500
-#define WATCHDOG_TIMEOUT 75   // segundos (modificado a 75s)
+#define WEIGHT_STABILIZE_TIME 2000
 
 // Hardware
 const uint8_t SWITCH_PINS[9] = {5, 32, 26, 14, 4, 23, 33, 27, 12};
@@ -48,41 +46,36 @@ const uint8_t bottleToLed[9] = {2, 6, 10, 14, 0, 4, 8, 12, 16};
 #define COB_WARM_PIN 2
 #define COB_COOL_PIN 25
 
+// Weight
 #define WEIGHT_CALIBRATION_FACTOR -94.302184
-#define WEIGHT_THRESHOLD 50.0
+#define WEIGHT_THRESHOLD 100.0
+#define NUM_WEIGHT_READINGS 5
+#define WEIGHT_OUTLIER_THRESHOLD 200.0
+
 #define COB_PWM_FREQUENCY 5000
 #define COB_PWM_RESOLUTION 8
+#define PWM_MAX 255
 #define TEMP_MIN 2700
 #define TEMP_MAX 6500
+#define BLINK_INTERVAL 500
 
-// Blink settings
-#define BLINK_INTERVAL 500  // 500ms on/off
+// ==================== STATE ====================
+enum PositionState {
+  STATE_EMPTY,
+  STATE_DEBOUNCING,
+  STATE_WEIGHING,
+  STATE_OCCUPIED,
+  STATE_REMOVING
+};
 
-// ==================== GLOBALS ====================
-WiFiClient wifiClient;
-PubSubClient mqttClient(wifiClient);
-Adafruit_NeoPixel strip(NUM_LEDS, WS2812_DATA_PIN, NEO_GRB + NEO_KHZ800);
-HX711 scale;
-Adafruit_SHT31 sht31 = Adafruit_SHT31();
+struct BottlePosition {
+  PositionState state;
+  unsigned long stateTimer;
+  float weight;
+  uint8_t debounceCount;
+  float weightBeforePlacement;  // Track total weight before this bottle was placed
+};
 
-volatile bool otaInProgress = false;
-
-struct {
-  bool positions[9];
-  float individualWeights[9];
-  float lastTotalWeight;
-  uint16_t currentTemperature = 4000;
-  uint8_t currentBrightness = 0;
-  float ambientTemperature = 0.0;
-  float ambientHumidity = 0.0;
-  bool weightSensorReady = false;
-  bool tempSensorReady = false;
-  uint8_t expectedPosition = 0;
-  String ipAddress = "0.0.0.0";
-  String connectedSSID = "";
-} state;
-
-// LED blink state
 struct LEDBlinkState {
   bool enabled;
   uint32_t color;
@@ -91,137 +84,146 @@ struct LEDBlinkState {
   bool currentState;
 };
 
+struct {
+  bool positions[9];
+  float individualWeights[9];
+  uint16_t currentTemperature = 4000;
+  uint8_t currentBrightness = 0;
+  float ambientTemperature = 0.0;
+  float ambientHumidity = 0.0;
+  bool weightSensorReady = false;
+  bool tempSensorReady = false;
+  uint8_t expectedPosition = 0;
+  String ipAddress = "0.0.0.0";
+} state;
+
+// ==================== GLOBALS ====================
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
+Adafruit_NeoPixel strip(NUM_LEDS, WS2812_DATA_PIN, NEO_GRB + NEO_KHZ800);
+HX711 scale;
+Adafruit_SHT31 sht31 = Adafruit_SHT31();
+
+BottlePosition positions[9];
 LEDBlinkState ledBlinkStates[9];
 
 char mqtt_topic_status[64];
 char mqtt_topic_command[64];
 
-// Forward declarations
-void setupNetwork();
-void connectMQTT();
-void setupOTA();
-void maintainConnections();
-void sendHeartbeat();
-void sendStartupMessage();
-void readAllPositions();
-float readTotalWeight();
-void updateTemperatureHumidity();
-void checkPositionChanges();
-void updateBlinkingLEDs();
-void setPositionLED(uint8_t position, uint32_t color, uint8_t brightness, bool blink);
-void setCOBLighting(uint16_t temperature, uint8_t brightness);
-void allLightsOff();
-void handleCommand(JsonDocument& doc);
-
 // ==================== SETUP ====================
 void setup() {
-  pinMode(COB_WARM_PIN, OUTPUT);
-  digitalWrite(COB_WARM_PIN, LOW);
-  pinMode(COB_COOL_PIN, OUTPUT);
-  digitalWrite(COB_COOL_PIN, LOW);
-  delay(100);
-  
   Serial.begin(115200);
   delay(500);
   Serial.println("\n========================================");
   Serial.println("WineFridge Drawer - " + String(DRAWER_ID));
   Serial.println("Firmware: v" + String(FIRMWARE_VERSION));
   Serial.println("========================================");
-
-  // Configurar WDT con 75s
-  esp_task_wdt_config_t wdt_config = {
-    .timeout_ms = WATCHDOG_TIMEOUT * 1000,
-    .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
-    .trigger_panic = true
-  };
-  // Reinit for safety
-  esp_task_wdt_deinit();
-  esp_task_wdt_init(&wdt_config);
-  esp_task_wdt_add(NULL);
-
-  memset(&state.positions, 0, sizeof(state.positions));
-  memset(&state.individualWeights, 0, sizeof(state.individualWeights));
+  
+  memset(&state, 0, sizeof(state));
+  memset(&positions, 0, sizeof(positions));
   memset(&ledBlinkStates, 0, sizeof(ledBlinkStates));
   
   snprintf(mqtt_topic_status, sizeof(mqtt_topic_status), "winefridge/%s/status", DRAWER_ID);
   snprintf(mqtt_topic_command, sizeof(mqtt_topic_command), "winefridge/%s/command", DRAWER_ID);
   
-  Serial.println("[INIT] Hardware...");
-  
+  setupPins();
+  setupLEDs();
+  setupCOBLEDs();
+  setupSensors();
+
+  // Initialize all positions as empty first
+  for (int i = 0; i < 9; i++) {
+    positions[i].state = STATE_EMPTY;
+    positions[i].weight = 0.0;
+  }
+
+  setupNetwork();
+
+  // Detect existing bottles after network is ready
+  detectExistingBottles();
+
+  Serial.println("\n[READY]\n");
+}
+
+void setupPins() {
   for (int i = 0; i < 9; i++) {
     pinMode(SWITCH_PINS[i], INPUT_PULLUP);
   }
-  
+  Serial.println("[OK] GPIO pins");
+}
+
+void setupLEDs() {
   strip.begin();
   strip.clear();
   strip.show();
   Serial.println("[OK] WS2812B LEDs");
+}
+
+void setupCOBLEDs() {
+  Serial.println("[COB] Initializing COB LEDs...");
   
-  // Keep original ledcAttach usage to match your hardware setup
-  // But in this drawer sketch pins are COB_WARM_PIN/COB_COOL_PIN
-  // We'll use ledcAttach as per your base code:
+  // CRITICAL PATTERN for GPIO 2:
+  // 1. pinMode + digitalWrite LOW
+  pinMode(COB_WARM_PIN, OUTPUT);
+  pinMode(COB_COOL_PIN, OUTPUT);
+  digitalWrite(COB_WARM_PIN, LOW);
+  digitalWrite(COB_COOL_PIN, LOW);
+  
+  // 2. ledcDetach (clear any previous config)
+  ledcDetach(COB_WARM_PIN);
+  ledcDetach(COB_COOL_PIN);
+  delay(100);
+  
+  // 3. ledcAttach (setup PWM)
   ledcAttach(COB_WARM_PIN, COB_PWM_FREQUENCY, COB_PWM_RESOLUTION);
   ledcAttach(COB_COOL_PIN, COB_PWM_FREQUENCY, COB_PWM_RESOLUTION);
+  
+  // 4. Set to off
   ledcWrite(COB_WARM_PIN, 0);
   ledcWrite(COB_COOL_PIN, 0);
-  Serial.println("[OK] COB LEDs");
   
-  Serial.println("[INIT] Weight sensor...");
+  Serial.println("[COB] Testing - turning ON for 1 second...");
+
+  // Test: Turn on warm at 50%
+  ledcWrite(COB_WARM_PIN, 128);
+  delay(500);
+  ledcWrite(COB_WARM_PIN, 0);
+
+  // Test: Turn on cool at 50%
+  ledcWrite(COB_COOL_PIN, 128);
+  delay(500);
+  ledcWrite(COB_COOL_PIN, 0);
+
+  Serial.println("[OK] COB LEDs ready (will reset via MQTT after connection)");
+}
+
+void setupSensors() {
   scale.begin(HX711_DT_PIN, HX711_SCK_PIN);
-  delay(1000);
+  delay(500);
   
   if (scale.is_ready()) {
     scale.set_scale(WEIGHT_CALIBRATION_FACTOR);
-    delay(500);
-    
-    bool anyBottlesPresent = false;
-    for (int i = 0; i < 9; i++) {
-      if (digitalRead(SWITCH_PINS[i]) == LOW) {
-        anyBottlesPresent = true;
-        break;
-      }
-    }
-    
-    if (!anyBottlesPresent) {
-      Serial.println("[TARE] No bottles");
-      scale.tare();
-      state.lastTotalWeight = 0.0;
-    } else {
-      Serial.println("[SKIP] Bottles present");
-      state.lastTotalWeight = scale.get_units(3);
-    }
-    
+    delay(200);
+    scale.tare();
     state.weightSensorReady = true;
-    Serial.println("[OK] Weight sensor");
+    Serial.println("[OK] HX711 ready");
   } else {
-    Serial.println("[ERROR] Weight sensor");
+    state.weightSensorReady = false;
+    Serial.println("[WARN] HX711 FAILED");
   }
   
   Wire.begin(21, 22);
   if (sht31.begin(0x44)) {
     state.tempSensorReady = true;
-    Serial.println("[OK] Temperature sensor");
+    Serial.println("[OK] SHT31 sensor");
   } else {
-    Serial.println("[ERROR] Temperature sensor");
+    state.tempSensorReady = false;
+    Serial.println("[WARN] SHT31 FAILED");
   }
-  
-  setupNetwork();
-  
-  if (WiFi.status() == WL_CONNECTED) {
-    setupOTA();
-  }
-  
-  readAllPositions();
-  updateTemperatureHumidity();
-  
-  Serial.println("\n[READY] System initialized\n");
-  esp_task_wdt_reset();
 }
 
-// ==================== NETWORK / MQTT ====================
 void setupNetwork() {
   Serial.println("\n[WIFI] Starting...");
-  
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
   
@@ -235,18 +237,12 @@ void setupNetwork() {
     delay(500);
     Serial.print(".");
     attempts++;
-    esp_task_wdt_reset();
   }
   
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println(" failed");
-    Serial.println("[WIFI] Resetting WiFi module...");
     WiFi.disconnect(true);
     delay(1000);
-    WiFi.mode(WIFI_OFF);
-    delay(500);
-    WiFi.mode(WIFI_STA);
-    delay(500);
     
     Serial.print("[WIFI] Trying ");
     Serial.print(WIFI_SSID_2);
@@ -258,20 +254,18 @@ void setupNetwork() {
       delay(500);
       Serial.print(".");
       attempts++;
-      esp_task_wdt_reset();
     }
   }
   
   if (WiFi.status() == WL_CONNECTED) {
     state.ipAddress = WiFi.localIP().toString();
-    state.connectedSSID = WiFi.SSID();
     Serial.println(" ✓");
     Serial.println("[WIFI] IP: " + state.ipAddress);
-    Serial.println("[WIFI] SSID: " + state.connectedSSID);
     
     mqttClient.setServer(MQTT_BROKER_IP, MQTT_PORT);
     mqttClient.setCallback(onMQTTMessage);
-    mqttClient.setBufferSize(1024); // reducir buffer para liberar heap
+    mqttClient.setBufferSize(2048);
+    
     connectMQTT();
   } else {
     Serial.println(" ✗");
@@ -288,6 +282,7 @@ void connectMQTT() {
   if (mqttClient.connect(clientId.c_str())) {
     Serial.println(" ✓");
     mqttClient.subscribe(mqtt_topic_command);
+    Serial.println("[MQTT] Subscribed: " + String(mqtt_topic_command));
     sendStartupMessage();
   } else {
     Serial.print(" ✗ (");
@@ -296,373 +291,365 @@ void connectMQTT() {
   }
 }
 
-// ==================== OTA ====================
-void setupOTA() {
-  ArduinoOTA.setPort(3232);
-  ArduinoOTA.setPassword("winefridge2025");
-  ArduinoOTA.setHostname(DRAWER_ID);
-
-  ArduinoOTA.onStart([]() {
-    otaInProgress = true;
-    Serial.println("\n[OTA] Starting...");
-    // Desactivar WDT para que no reinicie durante la programación
-    esp_task_wdt_deinit();
-    // desconectar MQTT y apagar luces - minimizamos interferencias
-    if (mqttClient.connected()) mqttClient.disconnect();
-    strip.clear();
-    strip.show();
-    // apagar COB
-    ledcWrite(COB_WARM_PIN, 0);
-    ledcWrite(COB_COOL_PIN, 0);
-    // reducir actividad WiFi/CPU durante OTA
-    WiFi.setSleep(true);
-  });
-
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\n[OTA] Complete!");
-    // Restaurar WiFi sleep off para operación normal
-    WiFi.setSleep(false);
-    otaInProgress = false;
-    // Re-inicializamos WDT para operación normal
-    esp_task_wdt_config_t wdt_config = {
-      .timeout_ms = WATCHDOG_TIMEOUT * 1000,
-      .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
-      .trigger_panic = true
-    };
-    esp_task_wdt_init(&wdt_config);
-    esp_task_wdt_add(NULL);
-  });
-
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    static unsigned long lastReport = 0;
-    if (millis() - lastReport > 500) {
-      uint8_t p = (uint8_t)((progress * 100UL) / total);
-      Serial.printf("[OTA] Progress: %u%%\r", p);
-      lastReport = millis();
-    }
-    // si perdemos WiFi, abortar proactivamente
-    if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("\n[OTA] WiFi perdido, abortando...");
-      delay(500);
-      // Forzamos reboot para intentar recovery
-      ESP.restart();
-    }
-  });
-
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("\n[OTA] Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-    delay(1000);
-    ESP.restart();
-  });
-
-  ArduinoOTA.begin();
-  Serial.println("[OK] OTA ready");
-}
-
 // ==================== MAIN LOOP ====================
 void loop() {
-  // Llamada única a ArduinoOTA.handle - lo primero en loop
-  ArduinoOTA.handle();
-  if (otaInProgress) {
-    // No ejecutar nada que pueda bloquear (WDT está deinit)
-    return;
-  }
-
-  // Solo resetear WDT cuando no estamos en OTA
-  esp_task_wdt_reset();
-
-  // Actualizaciones normales de LEDs sólo si no hay OTA
+  yield();
+  
   updateBlinkingLEDs();
-
+  
   static unsigned long lastConnectionCheck = 0;
-  if (millis() - lastConnectionCheck > 10000) {
+  if (millis() - lastConnectionCheck > 30000) {
     maintainConnections();
     lastConnectionCheck = millis();
   }
-
-  if (mqttClient.connected()) mqttClient.loop();
-
-  static unsigned long lastSensorCheck = 0;
-  if (millis() - lastSensorCheck > 2000) {
-    checkPositionChanges();
-    lastSensorCheck = millis();
+  
+  if (mqttClient.connected()) {
+    mqttClient.loop();
   }
-
-  static unsigned long lastTempRead = 0;
-  if (millis() - lastTempRead > 15000) {
-    updateTemperatureHumidity();
-    lastTempRead = millis();
+  
+  for (int i = 0; i < 9; i++) {
+    updatePositionStateMachine(i);
   }
-
+  
+  static unsigned long lastSensorUpdate = 0;
+  if (millis() - lastSensorUpdate > 15000) {
+    updateSensors();
+    lastSensorUpdate = millis();
+  }
+  
   static unsigned long lastHeartbeat = 0;
   if (millis() - lastHeartbeat > HEARTBEAT_INTERVAL) {
     sendHeartbeat();
     lastHeartbeat = millis();
   }
-
+  
   delay(10);
 }
 
-// ==================== LED BLINKING ====================
-void updateBlinkingLEDs() {
-  // No ejecutar si OTA en progreso
-  if (otaInProgress) return;
-
-  unsigned long currentMillis = millis();
-  for (int i = 0; i < 9; i++) {
-    if (ledBlinkStates[i].enabled) {
-      if (currentMillis - ledBlinkStates[i].lastToggle >= BLINK_INTERVAL) {
-        ledBlinkStates[i].currentState = !ledBlinkStates[i].currentState;
-        ledBlinkStates[i].lastToggle = currentMillis;
-
-        uint8_t ledIndex = bottleToLed[i];
-        if (ledIndex < NUM_LEDS) {
-          if (ledBlinkStates[i].currentState) {
-            uint32_t color = ledBlinkStates[i].color;
-            uint8_t brightness = ledBlinkStates[i].brightness;
-            uint8_t r = ((color >> 16) & 0xFF) * brightness / 255;
-            uint8_t g = ((color >> 8) & 0xFF) * brightness / 255;
-            uint8_t b = (color & 0xFF) * brightness / 255;
-            strip.setPixelColor(ledIndex, strip.Color(r, g, b));
-          } else {
-            strip.setPixelColor(ledIndex, strip.Color(0, 0, 0));
+// ==================== STATE MACHINE ====================
+void updatePositionStateMachine(uint8_t position) {
+  bool currentSwitch = (digitalRead(SWITCH_PINS[position]) == LOW);
+  BottlePosition* pos = &positions[position];
+  
+  switch (pos->state) {
+    case STATE_EMPTY:
+      if (currentSwitch) {
+        pos->state = STATE_DEBOUNCING;
+        pos->stateTimer = millis();
+        pos->debounceCount = 1;
+      }
+      break;
+      
+    case STATE_DEBOUNCING:
+      if (!currentSwitch) {
+        pos->state = STATE_EMPTY;
+        pos->debounceCount = 0;
+      } else if (millis() - pos->stateTimer > DEBOUNCE_TIME) {
+        pos->debounceCount++;
+        pos->stateTimer = millis();
+        
+        if (pos->debounceCount >= 3) {
+          if (state.expectedPosition != 0 && (position + 1) != state.expectedPosition) {
+            Serial.printf("[WARN] Wrong position! Expected %d, got %d\n", 
+                         state.expectedPosition, position + 1);
+            sendWrongPlacement(position + 1);
+            setLED(position + 1, 0xFF0000, 100, true);
+            pos->state = STATE_EMPTY;
+            return;
           }
+          
+          pos->state = STATE_WEIGHING;
+          pos->stateTimer = millis();
+
+          // Save current total weight before placing bottle (for differential calculation)
+          if (scale.is_ready()) {
+            pos->weightBeforePlacement = scale.get_units(3);
+            Serial.printf("[POS %d] Weight before: %.1fg\n", position + 1, pos->weightBeforePlacement);
+          } else {
+            pos->weightBeforePlacement = 0.0;
+          }
+
+          setLED(position + 1, 0x00FF00, 50, true);
+          Serial.printf("[POS %d] Weighing...\n", position + 1);
         }
       }
-    }
-  }
-  // Mostrar todos los cambios de una sola vez
-  strip.show();
-}
+      break;
+      
+    case STATE_WEIGHING:
+      if (!currentSwitch) {
+        pos->state = STATE_EMPTY;
+        setLED(position + 1, 0x000000, 0, false);
+      } else if (millis() - pos->stateTimer > WEIGHT_STABILIZE_TIME) {
+        float totalWeightNow = getStableWeight();
+        float individualWeight;
 
-// ==================== MAINTAIN CONNECTIONS ====================
-void maintainConnections() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[WIFI] Lost, reconnecting...");
-    setupNetwork();
-    if (WiFi.status() == WL_CONNECTED && !otaInProgress) {
-      setupOTA();
-    }
-    return;
-  }
+        // If this position is expected (LOAD process), scale was TARED - read total weight directly
+        if (state.expectedPosition == (position + 1)) {
+          individualWeight = totalWeightNow;
+          Serial.printf("[POS %d] LOAD process - Total weight: %.1fg (scale was tared)\n",
+                       position + 1, totalWeightNow);
+        } else {
+          // Manual placement - calculate differential weight
+          individualWeight = totalWeightNow - pos->weightBeforePlacement;
+          Serial.printf("[POS %d] Manual placement - Total: %.1fg, Before: %.1fg, Individual: %.1fg\n",
+                       position + 1, totalWeightNow, pos->weightBeforePlacement, individualWeight);
+        }
 
-  if (!mqttClient.connected()) {
-    Serial.println("[MQTT] Lost, reconnecting...");
-    connectMQTT();
-  }
-}
+        if (individualWeight > WEIGHT_THRESHOLD) {
+          pos->weight = individualWeight;
+          state.individualWeights[position] = individualWeight;
+          state.positions[position] = true;
+          pos->state = STATE_OCCUPIED;
 
-// ==================== SENSORS ====================
-void readAllPositions() {
-  state.lastTotalWeight = readTotalWeight();
-  for (int i = 0; i < 9; i++) {
-    state.positions[i] = (digitalRead(SWITCH_PINS[i]) == LOW);
-  }
-}
+          setLED(position + 1, 0x808080, 30, false);
+          sendBottleEvent(position + 1, true, individualWeight);
 
-float readTotalWeight() {
-  if (!state.weightSensorReady || !scale.is_ready()) {
-    return state.lastTotalWeight;
-  }
+          Serial.printf("[POS %d] ✓ Placed: %.1fg\n", position + 1, individualWeight);
 
-  float totalWeight = 0;
-  int validReadings = 0;
-
-  for (int i = 0; i < 3; i++) {
-    yield();
-
-    if (scale.is_ready()) {
-      float reading = scale.get_units(1);
-      if (reading >= -100 && reading <= 5000 && !isnan(reading) && !isinf(reading)) {
-        totalWeight += reading;
-        validReadings++;
-      }
-    }
-    delay(50);
-  }
-
-  if (validReadings > 0) {
-    return max(0.0f, totalWeight / validReadings);
-  }
-
-  return state.lastTotalWeight;
-}
-
-void updateTemperatureHumidity() {
-  if (!state.tempSensorReady) return;
-
-  float t = sht31.readTemperature();
-  float h = sht31.readHumidity();
-
-  if (!isnan(t) && !isnan(h)) {
-    state.ambientTemperature = round(t * 10.0) / 10.0;
-    state.ambientHumidity = round(h * 10.0) / 10.0;
-  }
-}
-
-void checkPositionChanges() {
-  static bool lastPositions[9] = {false};
-  static unsigned long lastDebounce[9] = {0};
-  static bool processingChange = false;
-
-  if (processingChange) return;
-
-  for (int i = 0; i < 9; i++) {
-    bool currentState = (digitalRead(SWITCH_PINS[i]) == LOW);
-
-    if (millis() - lastDebounce[i] < DEBOUNCE_TIME) continue;
-
-    if (currentState != lastPositions[i]) {
-      lastDebounce[i] = millis();
-      processingChange = true;
-
-      delay(DEBOUNCE_TIME);
-      currentState = (digitalRead(SWITCH_PINS[i]) == LOW);
-
-      if (currentState != lastPositions[i]) {
-        lastPositions[i] = currentState;
-        state.positions[i] = currentState;
-
-        float weightChange = 0.0;
-
-        if (currentState) {
-          delay(WEIGHT_STABILIZE_TIME);
-          float newWeight = readTotalWeight();
-          weightChange = newWeight - state.lastTotalWeight;
-
-          if (weightChange > 10.0) {
-            state.individualWeights[i] = weightChange;
-            state.lastTotalWeight = newWeight;
-
-            if (state.expectedPosition > 0 && (i + 1) != state.expectedPosition) {
-              Serial.printf("[ERROR] Wrong position! Expected %d, got %d\n", state.expectedPosition, i + 1);
-              setPositionLED(i + 1, 0xFF0000, 100, false);
-              sendWrongPlacement(i + 1, state.expectedPosition);
-            } else {
-              setPositionLED(i + 1, 0x444444, 50, false);
-              Serial.printf("[PLACED] Position %d (%.1fg)\n", i + 1, weightChange);
-              sendBottleEvent(i + 1, currentState, weightChange);
-            }
+          if (state.expectedPosition == (position + 1)) {
+            state.expectedPosition = 0;
           }
         } else {
-          weightChange = state.individualWeights[i];
-          state.individualWeights[i] = 0.0;
-          delay(1000);
-          state.lastTotalWeight = readTotalWeight();
-          setPositionLED(i + 1, 0x000000, 0, false);
-          Serial.printf("[REMOVED] Position %d (%.1fg)\n", i + 1, weightChange);
-          sendBottleEvent(i + 1, currentState, weightChange);
+          Serial.printf("[POS %d] ✗ Weight too low: %.1fg\n", position + 1, individualWeight);
+          pos->state = STATE_EMPTY;
+          setLED(position + 1, 0xFF0000, 100, true);
+          delay(2000);
+          setLED(position + 1, 0x000000, 0, false);
         }
-
-        processingChange = false;
-        return;
       }
+      break;
+      
+    case STATE_OCCUPIED:
+      if (!currentSwitch) {
+        pos->state = STATE_REMOVING;
+        pos->stateTimer = millis();
+      }
+      break;
+      
+    case STATE_REMOVING:
+      if (currentSwitch) {
+        pos->state = STATE_OCCUPIED;
+      } else if (millis() - pos->stateTimer > DEBOUNCE_TIME * 3) {
+        float oldWeight = pos->weight;
+        pos->weight = 0.0;
+        state.individualWeights[position] = 0.0;
+        state.positions[position] = false;
+        pos->state = STATE_EMPTY;
+        
+        setLED(position + 1, 0x000000, 0, false);
+        sendBottleEvent(position + 1, false, oldWeight);
+        
+        Serial.printf("[POS %d] ✓ Removed: %.1fg\n", position + 1, oldWeight);
+      }
+      break;
+  }
+}
 
-      processingChange = false;
+float getStableWeight() {
+  if (!state.weightSensorReady || !scale.is_ready()) {
+    return 0.0;
+  }
+  
+  float readings[NUM_WEIGHT_READINGS];
+  unsigned long interval = WEIGHT_STABILIZE_TIME / NUM_WEIGHT_READINGS;
+  
+  for (int i = 0; i < NUM_WEIGHT_READINGS; i++) {
+    if (i > 0) delay(interval);
+    readings[i] = scale.get_units(1);
+  }
+  
+  for (int i = 0; i < NUM_WEIGHT_READINGS - 1; i++) {
+    for (int j = i + 1; j < NUM_WEIGHT_READINGS; j++) {
+      if (readings[i] > readings[j]) {
+        float temp = readings[i];
+        readings[i] = readings[j];
+        readings[j] = temp;
+      }
+    }
+  }
+  
+  float median = readings[NUM_WEIGHT_READINGS / 2];
+  
+  float sum = 0.0;
+  int count = 0;
+  
+  for (int i = 0; i < NUM_WEIGHT_READINGS; i++) {
+    if (abs(readings[i] - median) < WEIGHT_OUTLIER_THRESHOLD) {
+      sum += readings[i];
+      count++;
+    }
+  }
+  
+  if (count == 0) return 0.0;
+  
+  float average = sum / count;
+  return max(0.0f, average);
+}
+
+void updateSensors() {
+  if (state.tempSensorReady) {
+    float t = sht31.readTemperature();
+    float h = sht31.readHumidity();
+    
+    if (!isnan(t) && !isnan(h)) {
+      state.ambientTemperature = round(t * 10.0) / 10.0;
+      state.ambientHumidity = round(h * 10.0) / 10.0;
     }
   }
 }
 
-// ==================== LED CONTROL ====================
-void setPositionLED(uint8_t position, uint32_t color, uint8_t brightness, bool blink) {
+// ==================== LED FUNCTIONS ====================
+void setLED(uint8_t position, uint32_t color, uint8_t brightness, bool blink) {
   if (position < 1 || position > 9) return;
-
+  
   uint8_t ledIndex = bottleToLed[position - 1];
   if (ledIndex >= NUM_LEDS) return;
-
-  // Update blink state
+  
   ledBlinkStates[position - 1].enabled = blink;
   ledBlinkStates[position - 1].color = color;
   ledBlinkStates[position - 1].brightness = brightness;
   ledBlinkStates[position - 1].lastToggle = millis();
   ledBlinkStates[position - 1].currentState = true;
-
+  
   if (!blink) {
-    // Solid color
-    uint8_t r = ((color >> 16) & 0xFF) * brightness / 255;
-    uint8_t g = ((color >> 8) & 0xFF) * brightness / 255;
-    uint8_t b = (color & 0xFF) * brightness / 255;
-
+    uint8_t r = ((color >> 16) & 0xFF) * brightness / 100;
+    uint8_t g = ((color >> 8) & 0xFF) * brightness / 100;
+    uint8_t b = (color & 0xFF) * brightness / 100;
     strip.setPixelColor(ledIndex, strip.Color(r, g, b));
     strip.show();
   }
-  // If blink, updateBlinkingLEDs() will handle it
+}
+
+void updateBlinkingLEDs() {
+  static unsigned long lastUpdate = 0;
+  if (millis() - lastUpdate < 50) return;
+  lastUpdate = millis();
+  
+  bool needsUpdate = false;
+  
+  for (int i = 0; i < 9; i++) {
+    if (ledBlinkStates[i].enabled) {
+      if (millis() - ledBlinkStates[i].lastToggle >= BLINK_INTERVAL) {
+        ledBlinkStates[i].currentState = !ledBlinkStates[i].currentState;
+        ledBlinkStates[i].lastToggle = millis();
+        
+        uint8_t ledIndex = bottleToLed[i];
+        if (ledBlinkStates[i].currentState) {
+          uint32_t color = ledBlinkStates[i].color;
+          uint8_t brightness = ledBlinkStates[i].brightness;
+          uint8_t r = ((color >> 16) & 0xFF) * brightness / 100;
+          uint8_t g = ((color >> 8) & 0xFF) * brightness / 100;
+          uint8_t b = (color & 0xFF) * brightness / 100;
+          strip.setPixelColor(ledIndex, strip.Color(r, g, b));
+        } else {
+          strip.setPixelColor(ledIndex, 0);
+        }
+        needsUpdate = true;
+      }
+    }
+  }
+  
+  if (needsUpdate) {
+    strip.show();
+  }
 }
 
 void setCOBLighting(uint16_t temperature, uint8_t brightness) {
   temperature = constrain(temperature, TEMP_MIN, TEMP_MAX);
   brightness = constrain(brightness, 0, 100);
 
+  Serial.printf("[COB] Setting T=%dK B=%d%%\n", temperature, brightness);
+
   if (brightness == 0) {
+    // Turn off: detach, reset, reattach
+    ledcDetach(COB_WARM_PIN);
+    ledcDetach(COB_COOL_PIN);
+    delay(50);
+    pinMode(COB_WARM_PIN, OUTPUT);
+    pinMode(COB_COOL_PIN, OUTPUT);
+    digitalWrite(COB_WARM_PIN, LOW);
+    digitalWrite(COB_COOL_PIN, LOW);
+    delay(50);
+    ledcAttach(COB_WARM_PIN, COB_PWM_FREQUENCY, COB_PWM_RESOLUTION);
+    ledcAttach(COB_COOL_PIN, COB_PWM_FREQUENCY, COB_PWM_RESOLUTION);
     ledcWrite(COB_WARM_PIN, 0);
     ledcWrite(COB_COOL_PIN, 0);
-    state.currentBrightness = 0;
-    return;
+    Serial.println("[COB] OFF");
+  } else {
+    float warmRatio = map(temperature, TEMP_MIN, TEMP_MAX, 100, 0) / 100.0;
+    float coolRatio = 1.0 - warmRatio;
+
+    uint8_t maxPWM = map(brightness, 0, 100, 0, PWM_MAX);
+    uint8_t warmPWM = maxPWM * warmRatio;
+    uint8_t coolPWM = maxPWM * coolRatio;
+
+    ledcWrite(COB_WARM_PIN, warmPWM);
+    ledcWrite(COB_COOL_PIN, coolPWM);
+    
+    Serial.printf("[COB] Warm=%d Cool=%d (%.2f/%.2f)\n", warmPWM, coolPWM, warmRatio, coolRatio);
   }
-
-  float warmRatio = map(temperature, TEMP_MIN, TEMP_MAX, 100, 0) / 100.0;
-  float coolRatio = 1.0 - warmRatio;
-
-  uint8_t maxPWM = map(brightness, 0, 100, 0, 255);
-  uint8_t warmPWM = maxPWM * warmRatio;
-  uint8_t coolPWM = maxPWM * coolRatio;
-
-  ledcWrite(COB_WARM_PIN, warmPWM);
-  ledcWrite(COB_COOL_PIN, coolPWM);
 
   state.currentTemperature = temperature;
   state.currentBrightness = brightness;
-
-  Serial.printf("[COB] %dK @ %d%%\n", temperature, brightness);
 }
 
-void allLightsOff() {
-  // Apaga LEDs y COB
-  strip.clear();
-  strip.show();
-  ledcWrite(COB_WARM_PIN, 0);
-  ledcWrite(COB_COOL_PIN, 0);
-  // Reset state flags
-  for (int i = 0; i < 9; i++) {
-    ledBlinkStates[i].enabled = false;
-  }
-  state.currentBrightness = 0;
-}
-
-// ==================== MQTT / JSON ====================
+// ==================== MQTT ====================
 void onMQTTMessage(char* topic, byte* payload, unsigned int length) {
   if (length > 1500) return;
-
+  
   char message[length + 1];
   memcpy(message, payload, length);
   message[length] = '\0';
-
+  
+  Serial.printf("[MQTT] RX: %s\n", message);
+  
   StaticJsonDocument<1536> doc;
   if (deserializeJson(doc, message) == DeserializationError::Ok) {
     handleCommand(doc);
+  } else {
+    Serial.println("[MQTT] JSON parse error");
   }
 }
 
 void handleCommand(JsonDocument& doc) {
   String action = doc["action"];
   JsonObject data = doc["data"];
-
+  
+  Serial.println("[MQTT] Action: " + action);
+  
   if (action == "set_leds") {
-    JsonArray positions = data["positions"];
-    for (JsonObject pos : positions) {
-      uint8_t position = pos["position"];
-      String colorStr = pos["color"];
-      uint8_t brightness = pos["brightness"];
-      bool blink = pos["blink"] | false;  // Default false
+    JsonArray positionsArray = data["positions"];
 
-      if (position >= 1 && position <= 9) {
-        uint32_t color = strtol(colorStr.c_str() + 1, NULL, 16);
-        setPositionLED(position, color, brightness, blink);
+    // If empty array, turn off ALL LEDs and disable all blink states
+    if (positionsArray.size() == 0) {
+      Serial.println("[LED] Clearing ALL LEDs");
+      for (int i = 0; i < 9; i++) {
+        ledBlinkStates[i].enabled = false;
+        uint8_t ledIndex = bottleToLed[i];
+        strip.setPixelColor(ledIndex, 0);
+      }
+      strip.show();
+    } else {
+      // Clear all LEDs first before setting new ones
+      for (int i = 0; i < 9; i++) {
+        ledBlinkStates[i].enabled = false;
+        uint8_t ledIndex = bottleToLed[i];
+        strip.setPixelColor(ledIndex, 0);
+      }
+
+      // Set the specified LEDs
+      for (JsonObject pos : positionsArray) {
+        uint8_t position = pos["position"];
+        String colorStr = pos["color"];
+        uint8_t brightness = pos["brightness"];
+        bool blink = pos.containsKey("blink") ? pos["blink"].as<bool>() : false;
+
+        if (position >= 1 && position <= 9) {
+          uint32_t color = strtol(colorStr.c_str() + 1, NULL, 16);
+          setLED(position, color, brightness, blink);
+          Serial.printf("[LED] Pos %d: %s @%d%% Blink:%d\n",
+                       position, colorStr.c_str(), brightness, blink);
+        }
       }
     }
   }
@@ -674,95 +661,182 @@ void handleCommand(JsonDocument& doc) {
   else if (action == "expect_bottle") {
     uint8_t position = data["position"];
     state.expectedPosition = position;
+    Serial.printf("[CMD] Expecting position %d\n", position);
+
+    // Tare the scale so we only measure the new bottle's weight
+    if (scale.is_ready()) {
+      scale.tare();
+      Serial.println("[CMD] ✓ Scale tared - ready to measure new bottle");
+    }
   }
-  else if (action == "read_sensors") {
-    sendHeartbeat();
+  else if (action == "manual_tare") {
+    if (scale.is_ready()) {
+      scale.tare();
+      Serial.println("[CMD] ✓ Tare complete");
+    }
   }
   else if (action == "reboot") {
-    Serial.println("[CMD] Rebooting...");
-    delay(1000);
+    Serial.println("[CMD] Rebooting in 2s...");
+    delay(2000);
     ESP.restart();
   }
 }
 
 void sendHeartbeat() {
   if (!mqttClient.connected()) return;
-
-  StaticJsonDocument<1024> doc;
+  
+  StaticJsonDocument<640> doc;
   doc["action"] = "heartbeat";
   doc["source"] = DRAWER_ID;
   doc["firmware"] = FIRMWARE_VERSION;
   doc["ip"] = state.ipAddress;
-
+  
   JsonObject data = doc.createNestedObject("data");
-  data["uptime"] = millis();
-  data["wifi_rssi"] = WiFi.RSSI();
-  data["ssid"] = state.connectedSSID;
-  data["total_weight"] = round(state.lastTotalWeight * 10.0) / 10.0;
+  data["uptime"] = millis() / 1000;
+  
+  float total = 0.0;
+  for (int i = 0; i < 9; i++) total += state.individualWeights[i];
+  data["total_weight"] = round(total * 10.0) / 10.0;
+  
   data["temperature"] = state.ambientTemperature;
   data["humidity"] = state.ambientHumidity;
-  data["cob_temp"] = state.currentTemperature;
-  data["cob_brightness"] = state.currentBrightness;
+  
+  JsonArray occupied = data.createNestedArray("occupied");
+  for (int i = 0; i < 9; i++) occupied.add(state.positions[i] ? 1 : 0);
+  
+  JsonArray weights = data.createNestedArray("weights");
+  for (int i = 0; i < 9; i++) weights.add(round(state.individualWeights[i] * 10.0) / 10.0);
+  
+  char light[32];
+  snprintf(light, sizeof(light), "%dK %d%%", state.currentTemperature, state.currentBrightness);
+  data["cob_light"] = light;
+  data["wifi_rssi"] = WiFi.RSSI();
+  
+  char buffer[640];
+  serializeJson(doc, buffer);
+  mqttClient.publish(mqtt_topic_status, buffer);
+}
 
-  JsonArray positions = data.createNestedArray("positions");
-  for (int i = 0; i < 9; i++) {
-    JsonObject pos = positions.createNestedObject();
-    pos["position"] = i + 1;
-    pos["occupied"] = state.positions[i];
-    pos["weight"] = round(state.individualWeights[i] * 10.0) / 10.0;
-  }
+void sendBottleEvent(uint8_t position, bool placed, float weight) {
+  if (!mqttClient.connected()) return;
+  
+  StaticJsonDocument<320> doc;
+  doc["action"] = "bottle_event";
+  doc["source"] = DRAWER_ID;
+  
+  JsonObject data = doc.createNestedObject("data");
+  data["event"] = placed ? "placed" : "removed";
+  data["position"] = position;
+  data["weight"] = round(weight * 10.0) / 10.0;
+  
+  char buffer[320];
+  serializeJson(doc, buffer);
+  mqttClient.publish(mqtt_topic_status, buffer);
+}
 
-  String output;
-  serializeJson(doc, output);
-  mqttClient.publish(mqtt_topic_status, output.c_str());
+void sendWrongPlacement(uint8_t position) {
+  if (!mqttClient.connected()) return;
+  
+  StaticJsonDocument<256> doc;
+  doc["action"] = "wrong_placement";
+  doc["source"] = DRAWER_ID;
+  
+  JsonObject data = doc.createNestedObject("data");
+  data["position"] = position;
+  data["expected_position"] = state.expectedPosition;
+  
+  char buffer[256];
+  serializeJson(doc, buffer);
+  mqttClient.publish(mqtt_topic_status, buffer);
 }
 
 void sendStartupMessage() {
   StaticJsonDocument<256> doc;
   doc["action"] = "startup";
   doc["source"] = DRAWER_ID;
+  doc["firmware"] = FIRMWARE_VERSION;
+  doc["ip"] = state.ipAddress;
 
-  JsonObject data = doc.createNestedObject("data");
-  data["firmware"] = FIRMWARE_VERSION;
-  data["ip"] = state.ipAddress;
-  data["ssid"] = state.connectedSSID;
+  char buffer[256];
+  serializeJson(doc, buffer);
+  mqttClient.publish(mqtt_topic_status, buffer);
+  Serial.println("[MQTT] Startup sent");
 
-  String output;
-  serializeJson(doc, output);
-  mqttClient.publish(mqtt_topic_status, output.c_str());
+  // Simulate receiving brightness=0 message to reset COB lights to clean state
+  // This is necessary after the test sequence in setupCOBLEDs()
+  Serial.println("[INIT] Simulating brightness=0 command to reset COB lights...");
+  StaticJsonDocument<256> cobResetDoc;
+  cobResetDoc["action"] = "set_general_light";
+  JsonObject data = cobResetDoc.createNestedObject("data");
+  data["temperature"] = 4000;
+  data["brightness"] = 0;
+  handleCommand(cobResetDoc);
 }
 
-void sendBottleEvent(uint8_t position, bool occupied, float weight) {
-  if (!mqttClient.connected()) return;
+void detectExistingBottles() {
+  Serial.println("[INIT] Detecting existing bottles...");
 
-  StaticJsonDocument<256> doc;
-  doc["action"] = "bottle_event";
-  doc["source"] = DRAWER_ID;
+  if (!state.weightSensorReady) {
+    Serial.println("[INIT] ✗ Weight sensor not ready, skipping detection");
+    return;
+  }
 
-  JsonObject data = doc.createNestedObject("data");
-  data["event"] = occupied ? "placed" : "removed";
-  data["position"] = position;
-  data["weight"] = weight;
-  data["total_weight"] = state.lastTotalWeight;
+  delay(1000); // Wait for weight sensor to stabilize after tare
 
-  String output;
-  serializeJson(doc, output);
-  mqttClient.publish(mqtt_topic_status, output.c_str());
+  // Count pressed switches (bottles present)
+  int bottlesPresent = 0;
+  bool switchStates[9];
+
+  for (int i = 0; i < 9; i++) {
+    switchStates[i] = (digitalRead(SWITCH_PINS[i]) == LOW);
+    if (switchStates[i]) {
+      bottlesPresent++;
+    }
+  }
+
+  if (bottlesPresent == 0) {
+    Serial.println("[INIT] No bottles detected");
+    return;
+  }
+
+  // Read total weight
+  float totalWeight = getStableWeight();
+
+  if (totalWeight < (WEIGHT_THRESHOLD * bottlesPresent * 0.5)) {
+    // Weight too low, probably false detection
+    Serial.printf("[INIT] ✗ Weight too low: %.1fg for %d bottles\n", totalWeight, bottlesPresent);
+    return;
+  }
+
+  // Estimate individual weight (simple average)
+  float estimatedWeight = totalWeight / bottlesPresent;
+
+  Serial.printf("[INIT] Found %d bottles, total weight: %.1fg\n", bottlesPresent, totalWeight);
+
+  // Mark positions as occupied
+  for (int i = 0; i < 9; i++) {
+    if (switchStates[i]) {
+      positions[i].state = STATE_OCCUPIED;
+      positions[i].weight = estimatedWeight;
+      state.positions[i] = true;
+      state.individualWeights[i] = estimatedWeight;
+
+      Serial.printf("[INIT] ✓ Position %d occupied (est. %.1fg)\n", i + 1, estimatedWeight);
+    }
+  }
+
+  Serial.println("[INIT] ✓ Detection complete\n");
 }
 
-void sendWrongPlacement(uint8_t wrongPosition, uint8_t expectedPosition) {
-  if (!mqttClient.connected()) return;
+void maintainConnections() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[WIFI] Reconnecting...");
+    WiFi.reconnect();
+    return;
+  }
 
-  StaticJsonDocument<256> doc;
-  doc["action"] = "placement_error";
-  doc["source"] = DRAWER_ID;
-
-  JsonObject data = doc.createNestedObject("data");
-  data["drawer"] = DRAWER_ID;
-  data["position"] = wrongPosition;
-  data["expected_position"] = expectedPosition;
-
-  String output;
-  serializeJson(doc, output);
-  mqttClient.publish("winefridge/system/status", output.c_str());
+  if (!mqttClient.connected()) {
+    Serial.println("[MQTT] Reconnecting...");
+    connectMQTT();
+  }
 }

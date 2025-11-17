@@ -94,18 +94,41 @@ const mqttActions = {
 
       // Update modal text with specific positions
       if (swapErrorTitle) {
-        swapErrorTitle.innerHTML = `Wrong Position<br/>During Swap`
+        swapErrorTitle.innerHTML = `Swap <br />Wrong Position`
       }
       if (swapErrorSubtitle) {
         swapErrorSubtitle.innerHTML = `You placed bottle at position <strong>${data.wrong_position}</strong>.<br/>Please place at position <strong>${expectedPos}</strong> instead.<br/><br/>LEDs show: <span style="color: red">RED = wrong</span>, <span style="color: green">GREEN = correct</span>`
       }
 
-      // Show error modal
+      // Hide swap modal and show error modal
+      swapBottlesModal.classList.remove('active')
       swapErrorModal.classList.add('active')
     } else {
       // Fallback to alert for other errors
       alert(`⚠️ Swap Error\n\n${data.error || 'Unknown error'}`)
     }
+  },
+
+  // Handle bottle removed from wrong position during swap
+  wrong_swap_bottle_removed(data) {
+    console.log('[SWAP] Wrong position bottle removed:', data)
+    // Close error modal and show swap modal again
+    swapErrorModal.classList.remove('active')
+    swapBottlesModal.classList.add('active')
+  },
+
+  swap_timeout(data) {
+    console.log('[SWAP] Timeout - returning to home')
+    // Close all modals
+    swapBottlesModal.classList.remove('active')
+    swapBottlesSuccessModal.classList.remove('active')
+    swapErrorModal.classList.remove('active')
+    resetScene()
+
+    // Redirect to home after a brief delay
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 100)
   }
 }
 

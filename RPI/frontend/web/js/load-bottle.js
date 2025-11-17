@@ -157,21 +157,30 @@ const mqttActions = {
       loadBottleErrorModal.classList.remove('active')
       loadBottleSuccessModal.classList.add('active')
       scannedBottle = null
-    } else if (data.close_screen) {
-      // Timeout occurred - close all load modals and return to welcome screen
-      console.log('[LOAD] Timeout - closing all modals')
-      loadBottleDrawerModal.classList.remove('active')
-      loadBottleErrorModal.classList.remove('active')
-      loadBottleInfoModal.classList.remove('active')
-      scanCircle.classList.remove('active')
-      scannedBottle = null
     }
   },
-  
+
   wrong_bottle_removed(data) {
     console.log('[LOAD] Wrong bottle removed, showing drawer modal again')
     loadBottleErrorModal.classList.remove('active')
     loadBottleDrawerModal.classList.add('active')
+  },
+
+  load_timeout(data) {
+    console.log('[LOAD] Timeout - returning to home')
+    // Close all modals
+    loadBottleWelcomeModal.classList.remove('active')
+    loadBottleInfoModal.classList.remove('active')
+    loadBottleDrawerModal.classList.remove('active')
+    loadBottleErrorModal.classList.remove('active')
+    loadBottleSuccessModal.classList.remove('active')
+    scanCircle.classList.remove('active')
+    scannedBottle = null
+
+    // Redirect to home after a brief delay
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 100)
   },
 }
 

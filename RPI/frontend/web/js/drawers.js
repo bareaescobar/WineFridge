@@ -16,6 +16,7 @@ const drawerId = new URLSearchParams(location.search).get('drawer')
 
 const takeWineModal = document.getElementById('take-bottle-drawer-modal')
 const takeWineSuccessModal = document.getElementById('take-bottle-success-modal')
+const unloadErrorModal = document.getElementById('unload-error-modal')
 const bottleInfoModal = document.getElementById('bottle-info-modal')
 
 const drawerElem = document.querySelector('.drawer')
@@ -67,21 +68,26 @@ function setupModalButtonsHandler() {
     if (target) target.classList.add('active')
 
     if (btn.dataset.target === 'take-bottle-drawer-modal') {
-      // FIXED: 'action' now inside 'data'
-      const data = {
-        action: 'start_unload',
-        barcode: selectedBottle.barcode,
-        name: selectedBottle.name,
-        drawer: selectedBottle.drawer  // Include drawer ID to unload from correct drawer
+      // Only send start_unload if coming from drawer-modal, not from error modal
+      const fromErrorModal = btn.closest('#unload-error-modal')
+
+      if (!fromErrorModal) {
+        // FIXED: 'action' now inside 'data'
+        const data = {
+          action: 'start_unload',
+          barcode: selectedBottle.barcode,
+          name: selectedBottle.name,
+          drawer: selectedBottle.drawer  // Include drawer ID to unload from correct drawer
+        }
+        const payload = {
+          timestamp: new Date().toISOString(),
+          source: 'web',
+          data: data
+        }
+
+        const message = JSON.stringify(payload)
+        publish(TOPICS.WEB_TO_RPI_COMMAND, message)
       }
-      const payload = {
-        timestamp: new Date().toISOString(),
-        source: 'web',
-        data: data
-      }
-      
-      const message = JSON.stringify(payload)
-      publish(TOPICS.WEB_TO_RPI_COMMAND, message)
 
       btn.closest('.modal')?.classList.remove('active')
     }
@@ -89,6 +95,7 @@ function setupModalButtonsHandler() {
     if (btn.dataset.target === 'drawer-modal') {
       takeWineModal.classList.remove('active')
       takeWineSuccessModal.classList.remove('active')
+      unloadErrorModal.classList.remove('active')
     }
     if (btn.dataset.target === 'bottle-info-modal') {
       renderBottleInfoSection(bottleInfoModal, selectedBottle, drawerId, zone, positions, mode, true)
@@ -108,9 +115,41 @@ function init() {
 }
 
 const mqttActions = {
+  expect_removal() {
+    // Modal is already showing, just waiting for bottle removal
+    console.log('[DRAWERS] Waiting for bottle removal...')
+  },
+
   bottle_unloaded() {
     takeWineModal.classList.remove('active')
     takeWineSuccessModal.classList.add('active')
+  },
+
+  wrong_bottle_removed(data) {
+    console.log('[DRAWERS] Wrong bottle removed:', data)
+    // Hide drawer modal and show error modal
+    takeWineModal.classList.remove('active')
+    unloadErrorModal.classList.add('active')
+  },
+
+  wrong_bottle_replaced(data) {
+    console.log('[DRAWERS] Wrong bottle placed back:', data)
+    // Close error modal and show drawer modal again
+    unloadErrorModal.classList.remove('active')
+    takeWineModal.classList.add('active')
+  },
+
+  unload_timeout(data) {
+    console.log('[DRAWERS] Unload timeout - returning to home')
+    // Close all modals
+    takeWineModal.classList.remove('active')
+    takeWineSuccessModal.classList.remove('active')
+    unloadErrorModal.classList.remove('active')
+
+    // Redirect to home after a brief delay
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 100)
   },
 }
 

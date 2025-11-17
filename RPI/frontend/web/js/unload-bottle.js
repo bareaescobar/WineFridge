@@ -62,6 +62,15 @@ const modalActions = {
     updateBottleInfoModalWithPosition(pickedProduct, pickedProductPositionDetails, bottleInfoContainer)
   },
   'unload-bottle-welcome-modal': () => {
+    // If coming from error modal, just go back to drawer modal (don't cancel operation)
+    const fromErrorModal = unloadErrorModal?.classList.contains('active')
+    if (fromErrorModal) {
+      console.log('[UNLOAD] User acknowledged error, going back to drawer modal')
+      unloadErrorModal.classList.remove('active')
+      unloadBottleDrawerModal.classList.add('active')
+      return
+    }
+
     // If coming from drawer modal (user pressed back during unload), cancel the unload operation
     const fromDrawerModal = unloadBottleDrawerModal?.classList.contains('active')
     if (fromDrawerModal) {
@@ -158,10 +167,35 @@ const mqttActions = {
     }
   },
 
+  // Handle wrong bottle placed back during unload
+  wrong_bottle_replaced(data) {
+    console.log('[UNLOAD] Wrong bottle placed back:', data)
+    // Close error modal and show drawer modal again
+    unloadErrorModal.classList.remove('active')
+    unloadBottleDrawerModal.classList.add('active')
+  },
+
   // Handle other unload errors (kept for compatibility)
   unload_error(data) {
     console.log('[UNLOAD] Error detected:', data)
     alert(`⚠️ Unload Error\n\n${data.error || 'Unknown error'}`)
+  },
+
+  unload_timeout(data) {
+    console.log('[UNLOAD] Timeout - returning to home')
+    // Close all modals
+    unloadBottleSuggestModal.classList.remove('active')
+    unloadBottleManuallyModal.classList.remove('active')
+    unloadBottleInfoModal.classList.remove('active')
+    unloadBottleDrawerModal.classList.remove('active')
+    mealRecommendModal.classList.remove('active')
+    unloadBottleSuccessModal.classList.remove('active')
+    unloadErrorModal.classList.remove('active')
+
+    // Redirect to home after a brief delay
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 100)
   },
 }
 

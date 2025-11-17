@@ -327,10 +327,20 @@
       "mode": "red",
       "positions": {
         "1": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8410415520628",
+          "name": "Se\u00f1or\u00edo de los Llanos Reserva",
+          "weight": 839.3,
+          "percentage": 100,
+          "last_update": "2025-11-13T12:12:25.910841"
         },
         "2": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8410415520628",
+          "name": "Se\u00f1or\u00edo de los Llanos Reserva",
+          "weight": 1185.6,
+          "percentage": 100,
+          "last_update": "2025-11-13T11:27:01.396096"
         },
         "3": {
           "occupied": false
