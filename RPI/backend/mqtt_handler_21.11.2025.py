@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 WineFridge MQTT Handler
-Version: 3.3.2
-Date: 21.11.2025
+Version: 3.3.1
+Date: 06.11.2025
 
 FIXES:
 1. ... (Historial de fixes) ...
@@ -12,8 +12,6 @@ FIXES:
 8. FIXED: `handle_zone_lighting` ahora envía los comandos múltiples
    correctos a los controladores de cajón y zona (ej. lighting_8, drawer_7)
    y usa la escala de brillo 0-100.
-9. FIXED: Corrected middle zone routing - drawer 5 is functional and needs
-   direct command, drawer 4 is controlled by lighting_6.
 """
 
 import json
@@ -43,7 +41,7 @@ def find_serial_port():
     """Detect serial port automatically on RPI5"""
     import os
     possible_ports = ['/dev/ttyAMA0', '/dev/serial0', '/dev/ttyAMA1']
-
+    
     for port in possible_ports:
         if os.path.exists(port):
             try:
@@ -56,15 +54,15 @@ def find_serial_port():
 
 class WineFridgeController:
     def __init__(self):
-        print("[INIT] Wine Fridge Controller v3.3.2")
-
+        print("[INIT] Wine Fridge Controller v3.3.1")
+        
         # Load databases
         self.inventory = self.load_json('/home/plasticlab/WineFridge/RPI/database/inventory.json')
         self.catalog = self.load_json('/home/plasticlab/WineFridge/RPI/database/wine-catalog.json')
-
+        
         # Track pending operations
         self.pending_operations = {}
-
+        
         # Track swap operations
         self.swap_operations = {
             'active': False,
@@ -72,13 +70,13 @@ class WineFridgeController:
             'bottles_to_place': [],
             'start_time': None
         }
-
+        
         # Barcode scanner state
         self.barcode_buffer = ""
         self.last_barcode = ""
         self.last_scan_time = 0
         self.scan_cooldown = 2.0
-
+        
         # Setup serial port for barcode scanner
         try:
             port = find_serial_port()
@@ -97,16 +95,16 @@ class WineFridgeController:
         except Exception as e:
             print(f"[SCANNER] ✗ Error: {e}")
             self.serial = None
-
+            
         # Setup MQTT
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
         self.client.on_disconnect = self.on_disconnect
-
+        
         print("[MQTT] Connecting to broker...")
         self.client.connect("localhost", 1883, 60)
-
+        
         # Start barcode scanner thread
         self.running = True
         if self.serial:
@@ -141,14 +139,14 @@ class WineFridgeController:
         """Calculate bottle fill percentage based on weight"""
         if weight < EMPTY_BOTTLE_WEIGHT:
             return 0
-
+            
         if weight >= MIN_FULL_BOTTLE_WEIGHT:
             return 100
-
+            
         wine_weight = weight - EMPTY_BOTTLE_WEIGHT
         full_wine_weight = MIN_FULL_BOTTLE_WEIGHT - EMPTY_BOTTLE_WEIGHT
         percentage = (wine_weight / full_wine_weight) * 100
-
+        
         return max(0, min(100, int(percentage)))
 
     def get_wine_type(self, barcode):
@@ -168,51 +166,51 @@ class WineFridgeController:
         """Barcode scanner loop running in background thread"""
         print("[SCANNER] Ready and listening...")
         last_data_time = 0
-
+        
         while self.running:
             try:
                 if self.serial.in_waiting > 0:
                     data = self.serial.read(self.serial.in_waiting)
                     last_data_time = time.time()
-
+                    
                     decoded = data.decode('utf-8', errors='ignore')
                     self.barcode_buffer += decoded
-
+                    
                     cleaned = self.barcode_buffer.strip()
                     if self.is_valid_barcode(cleaned):
                         current_time = time.time()
-
-                        if (cleaned != self.last_barcode or
+                        
+                        if (cleaned != self.last_barcode or 
                             current_time - self.last_scan_time > self.scan_cooldown):
-
+                            
                             print(f"[SCANNER] ✔ Detected: {cleaned}")
                             self.publish_barcode(cleaned)
-
+                            
                             self.last_barcode = cleaned
                             self.last_scan_time = current_time
-
+                            
                         self.barcode_buffer = ""
-
+                        
                 else:
                     current_time = time.time()
-                    if (self.barcode_buffer and
+                    if (self.barcode_buffer and 
                         current_time - last_data_time > 0.5 and
                         self.is_valid_barcode(self.barcode_buffer.strip())):
-
+                        
                         cleaned = self.barcode_buffer.strip()
                         if (cleaned != self.last_barcode or
                             current_time - self.last_scan_time > self.scan_cooldown):
-
+                            
                             print(f"[SCANNER] ✔ Detected (timeout): {cleaned}")
                             self.publish_barcode(cleaned)
-
+                            
                             self.last_barcode = cleaned
                             self.last_scan_time = current_time
-
+                            
                         self.barcode_buffer = ""
-
+                        
                 time.sleep(0.05)
-
+                
             except Exception as e:
                 print(f"[SCANNER] Error: {e}")
                 time.sleep(1)
@@ -289,7 +287,7 @@ class WineFridgeController:
         try:
             message = json.loads(msg.payload.decode())
             source = message.get('source', 'unknown')
-
+            
             # MODIFIED: Always get 'action' from the 'data' object for commands,
             # or the top level for status messages.
             action = None
@@ -300,22 +298,22 @@ class WineFridgeController:
 
             if action and action != 'heartbeat':
                 print(f"[MQTT] ← {action} from {source}")
-
+                
             if msg.topic == 'winefridge/system/command':
                 # Pass the nested 'data' object to the command handler
                 self.handle_system_command(message.get('data', {}))
-
+                
             elif msg.topic == 'winefridge/system/status':
                 if action == 'barcode_scanned' and source == 'barcode_scanner':
                     self.handle_barcode_scanned(message.get('data', {}))
-
+                    
             elif '/status' in msg.topic:
                 drawer_id = msg.topic.split('/')[1]
                 if action == 'bottle_event':
                     self.handle_drawer_status(drawer_id, message)
                 elif action == 'wrong_placement':
                     self.handle_wrong_placement(drawer_id, message)
-
+                    
         except Exception as e:
             print(f"[ERROR] Processing message: {e}")
 
@@ -323,7 +321,7 @@ class WineFridgeController:
         """Process scanned barcode from physical scanner"""
         barcode = data.get('barcode', '')
         print(f"[BARCODE] Processing: {barcode}")
-
+        
         if barcode not in self.catalog.get('wines', {}):
             print(f"[BARCODE] ✗ Not found in catalog")
             self.client.publish("winefridge/system/status", json.dumps({
@@ -336,15 +334,15 @@ class WineFridgeController:
                 "timestamp": datetime.now().isoformat()
             }))
             return
-
+            
         wine = self.catalog['wines'][barcode]
         wine_name = wine.get('name', 'Unknown Wine')
         wine_type = self.get_wine_type(barcode)
-
+        
         print(f"[BARCODE] ✔ Found: {wine_name}")
         if wine_type:
             print(f"[BARCODE]   Type: {wine_type}")
-
+            
         print(f"[BARCODE] Ready - waiting for frontend to call start_load")
 
     # MODIFIED: Now receives the 'data' object directly
@@ -378,18 +376,13 @@ class WineFridgeController:
             self.handle_shutdown()
 
     # =========================================================================
-    # FUNCIÓN CORREGIDA - Fixed routing for all zones
+    # FUNCIÓN CORREGIDA
     # =========================================================================
     def handle_zone_lighting(self, data):
         """
         Maneja los cambios de iluminación de la zona.
         Esto es complejo porque una "zona" (ej. 'upper') controla
         múltiples luces en diferentes tópicos de MQTT.
-        
-        ESTRUCTURA CORRECTA:
-        - Lower zone (zone 1): drawer 3 (functional) + drawers 1, 2 (lighting_2)
-        - Middle zone (zone 2): drawer 5 (functional) + drawers 4, 6 (lighting_6)
-        - Upper zone (zone 3): drawer 7 (functional) + drawers 8, 9 (lighting_8)
         """
         zone_name = data.get('zone') # 'upper', 'middle', 'lower'
         brightness_str = data.get('value', '0')
@@ -415,14 +408,14 @@ class WineFridgeController:
             brightness = 0
 
         # 3. Definir payloads de comando
-
+        
         # Payload para controladores de cajón "independientes" (ej. drawer_7)
         # (Basado en tu mosquitto_pub, no necesita 'drawer' key)
         drawer_payload_data = {
             "temperature": temperature,
             "brightness": brightness
         }
-
+        
         # Payload base para controladores "multi-cajón" (ej. lighting_8)
         # (Necesitará 'drawer' o 'zone' key añadidas)
         multi_controller_payload_data = {
@@ -431,10 +424,10 @@ class WineFridgeController:
         }
 
         commands_to_send = []
-
+        
         if zone_name == 'upper':
             # Zona 3, Cajones 7, 8, 9
-            # Cajón 7 -> drawer_7/command (FUNCTIONAL)
+            # Cajón 7 -> drawer_7/command
             commands_to_send.append({
                 "topic": "winefridge/drawer_7/command",
                 "payload": {"action": "set_general_light", "data": drawer_payload_data}
@@ -457,15 +450,16 @@ class WineFridgeController:
 
         elif zone_name == 'middle':
             # Zona 2, Cajones 4, 5, 6
-            # Cajón 4 -> lighting_6/command (NOT drawer_4!)
+            # (Lógica inferida de tu patrón 'upper')
+            # Cajón 4 -> drawer_4/command
+            commands_to_send.append({
+                "topic": "winefridge/drawer_4/command",
+                "payload": {"action": "set_general_light", "data": drawer_payload_data}
+            })
+            # Cajón 5 -> lighting_6/command
             commands_to_send.append({
                 "topic": "winefridge/lighting_6/command",
-                "payload": {"action": "set_general_light", "data": {**multi_controller_payload_data, "drawer": 4}}
-            })
-            # Cajón 5 -> drawer_5/command (FUNCTIONAL - direct command!)
-            commands_to_send.append({
-                "topic": "winefridge/drawer_5/command",
-                "payload": {"action": "set_general_light", "data": drawer_payload_data}
+                "payload": {"action": "set_general_light", "data": {**multi_controller_payload_data, "drawer": 5}}
             })
             # Cajón 6 -> lighting_6/command
             commands_to_send.append({
@@ -477,10 +471,11 @@ class WineFridgeController:
                 "topic": "winefridge/lighting_6/command",
                 "payload": {"action": "set_zone_light", "data": {**multi_controller_payload_data, "zone": 2}}
             })
-
+            
         elif zone_name == 'lower':
             # Zona 1, Cajones 1, 2, 3
-            # Cajón 3 -> drawer_3/command (FUNCTIONAL)
+            # (Lógica inferida de tu patrón 'upper')
+            # Cajón 3 -> drawer_3/command
             commands_to_send.append({
                 "topic": "winefridge/drawer_3/command",
                 "payload": {"action": "set_general_light", "data": drawer_payload_data}
@@ -500,7 +495,7 @@ class WineFridgeController:
                 "topic": "winefridge/lighting_2/command",
                 "payload": {"action": "set_zone_light", "data": {**multi_controller_payload_data, "zone": 1}}
             })
-
+        
         else:
             print(f"[LIGHTING] ✗ Zona desconocida: {zone_name}")
             return
@@ -514,13 +509,13 @@ class WineFridgeController:
                 "timestamp": datetime.now().isoformat(),
                 "source": "mqtt_handler"
             }
-
+            
             message = json.dumps(final_payload)
             self.client.publish(cmd["topic"], message)
             print(f"[LIGHTING] → Enviado a {cmd['topic']}: {message}")
-
+    
     # =========================================================================
-
+    
     # MODIFIED: Ahora recibe el 'data' object y funciona
     def handle_zone_settings(self, data):
         """Maneja los ajustes de temperatura/humedad de la zona"""
@@ -528,13 +523,13 @@ class WineFridgeController:
         mode = data.get('mode')
         target_temp = data.get('target')
         humidity = data.get('humidity')
-
+        
         print(f"[SETTINGS] Recibidos ajustes para zona {zone}: "
               f"Mode={mode}, Temp={target_temp}, Humidity={humidity}")
         #
         # ... Añade tu lógica aquí para controlar temperatura/humedad ...
         #
-
+        
         # Ejemplo: Confirmar actualización al cliente web
         time.sleep(1) # Simulando trabajo
         self.client.publish("winefridge/system/status", json.dumps({
@@ -549,7 +544,7 @@ class WineFridgeController:
         """Maneja los modos de iluminación de toda la nevera"""
         energy_saving = data.get('energy_saving')
         night_mode = data.get('night_mode')
-
+        
         print(f"[LIGHTING] Recibidos ajustes generales de luces: "
               f"Energy Saving={energy_saving}, Night Mode={night_mode}")
         #
@@ -562,19 +557,19 @@ class WineFridgeController:
         """Shutdown RPI safely"""
         print("[SHUTDOWN] Received shutdown command from web")
         print("[SHUTDOWN] Closing connections...")
-
+        
         shutdown_msg = {
             "action": "system_shutdown",
             "source": "mqtt_handler",
             "timestamp": datetime.now().isoformat()
         }
-
+        
         for drawer in ['drawer_3', 'drawer_5', 'drawer_7', 'lighting_2', 'lighting_6', 'lighting_8']:
             self.client.publish(f"winefridge/{drawer}/command", json.dumps(shutdown_msg))
-
+            
         print("[SHUTDOWN] Executing system shutdown in 3 seconds...")
         time.sleep(3)
-
+        
         import subprocess
         subprocess.run(['sudo', 'shutdown', 'now'])
 
@@ -585,7 +580,7 @@ class WineFridgeController:
             for pos in range(1, 10):
                 if str(pos) not in positions or not positions[str(pos)].get("occupied", False):
                     return preferred_drawer, pos
-
+                    
         for drawer_id in FUNCTIONAL_DRAWERS:
             if drawer_id == preferred_drawer:
                 continue
@@ -593,7 +588,7 @@ class WineFridgeController:
             for pos in range(1, 10):
                 if str(pos) not in positions or not positions[str(pos)].get("occupied", False):
                     return drawer_id, pos
-
+                    
         return None, None
 
     # MODIFIED: Now receives the 'data' object directly
@@ -602,15 +597,15 @@ class WineFridgeController:
         name = data.get('name', 'Unknown Wine')
         print(f"\n[LOAD] ═══════════════════════════════")
         print(f"[LOAD] Starting: {name[:40]}")
-
+        
         wine_type = self.get_wine_type(barcode)
         preferred_drawer = WINE_TYPE_DRAWERS.get(wine_type) if wine_type else None
-
+        
         if wine_type:
             print(f"[LOAD] Type: {wine_type} → Target: {preferred_drawer}")
-
+            
         drawer_id, position = self.find_empty_position(preferred_drawer)
-
+        
         if not drawer_id or not position:
             print("[LOAD] ✗ No empty positions available")
             self.client.publish("winefridge/system/status", json.dumps({
@@ -620,9 +615,9 @@ class WineFridgeController:
                 "timestamp": datetime.now().isoformat()
             }))
             return
-
+            
         print(f"[LOAD] Position: {drawer_id} slot #{position}")
-
+        
         op_id = f"load_{int(time.time())}"
         self.pending_operations[op_id] = {
             'type': 'load',
@@ -633,7 +628,7 @@ class WineFridgeController:
             'expected_position': position,
             'timestamp': time.time()
         }
-
+        
         print(f"[LOAD] → LED: Green blinking at position {position}")
         self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
             "action": "set_leds",
@@ -641,21 +636,21 @@ class WineFridgeController:
             "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100, "blink": True}]},
             "timestamp": datetime.now().isoformat()
         }))
-
+        
         self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
             "action": "expect_bottle",
             "source": "mqtt_handler",
             "data": {"position": position},
             "timestamp": datetime.now().isoformat()
         }))
-
+        
         self.client.publish("winefridge/system/status", json.dumps({
             "action": "expect_bottle",
             "source": "mqtt_handler",
             "data": {"drawer": drawer_id, "position": position, "wine_name": name},
             "timestamp": datetime.now().isoformat()
         }))
-
+        
         timer = threading.Timer(60, self.handle_timeout, [op_id])
         timer.start()
         self.pending_operations[op_id]['timer'] = timer
@@ -668,10 +663,10 @@ class WineFridgeController:
         name = data.get('name', 'Unknown Wine')
         print(f"\n[UNLOAD] ═══════════════════════════════")
         print(f"[UNLOAD] Starting: {name[:40]}")
-
+        
         # Try to find bottle location
         bottle_location = None
-
+        
         if data.get('position') and data.get('drawer_id'):
             drawer_id = data.get('drawer_id')
             position = data.get('position')
@@ -715,10 +710,10 @@ class WineFridgeController:
                 "timestamp": datetime.now().isoformat()
             }))
             return
-
+            
         drawer_id, position = bottle_location
         print(f"[UNLOAD] Position: {drawer_id} slot #{position}")
-
+        
         if drawer_id not in FUNCTIONAL_DRAWERS:
             print(f"[UNLOAD] ✗ {drawer_id} has no sensors")
             self.client.publish("winefridge/system/status", json.dumps({
@@ -728,7 +723,7 @@ class WineFridgeController:
                 "timestamp": datetime.now().isoformat()
             }))
             return
-
+            
         op_id = f"unload_{int(time.time())}"
         self.pending_operations[op_id] = {
             'type': 'unload',
@@ -739,7 +734,7 @@ class WineFridgeController:
             'expected_position': position,
             'timestamp': time.time()
         }
-
+        
         print(f"[UNLOAD] → LED: Green blinking at position {position}")
         self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
             "action": "set_leds",
@@ -747,14 +742,14 @@ class WineFridgeController:
             "data": {"positions": [{"position": position, "color": "#00FF00", "brightness": 100, "blink": True}]},
             "timestamp": datetime.now().isoformat()
         }))
-
+        
         self.client.publish("winefridge/system/status", json.dumps({
             "action": "expect_removal",
             "source": "mqtt_handler",
             "data": {"drawer": drawer_id, "position": position, "wine_name": name},
             "timestamp": datetime.now().isoformat()
         }))
-
+        
         timer = threading.Timer(60, self.handle_timeout, [op_id])
         timer.start()
         self.pending_operations[op_id]['timer'] = timer
@@ -1636,38 +1631,38 @@ class WineFridgeController:
             op_type = op.get('type')
             drawer = op.get('drawer')
             position = op.get('position')
-
+            
             print(f"[{op_type.upper()}] ✗ Timeout for {drawer} pos {position}")
-
+            
             self.client.publish(f"winefridge/{drawer}/command", json.dumps({
                 "action": "set_leds",
                 "source": "mqtt_handler",
                 "data": {"positions": []},
                 "timestamp": datetime.now().isoformat()
             }))
-
+            
             self.client.publish("winefridge/system/status", json.dumps({
                 "action": f"{op_type}_timeout",
                 "source": "mqtt_handler",
                 "data": {"drawer": drawer, "position": position},
                 "timestamp": datetime.now().isoformat()
             }))
-
+            
             del self.pending_operations[op_id]
 
     def update_inventory(self, drawer_id, position, barcode, name, weight, occupied=True):
         """Update the inventory.json file"""
         print(f"[DB] Updating {drawer_id} pos {position}...")
-
+        
         if "drawers" not in self.inventory:
             self.inventory["drawers"] = {}
         if drawer_id not in self.inventory["drawers"]:
             self.inventory["drawers"][drawer_id] = {"positions": {}}
         if "positions" not in self.inventory["drawers"][drawer_id]:
             self.inventory["drawers"][drawer_id]["positions"] = {}
-
+            
         position_str = str(position)
-
+        
         if occupied:
             percentage = self.calculate_bottle_percentage(weight)
             self.inventory["drawers"][drawer_id]["positions"][position_str] = {
@@ -1685,9 +1680,9 @@ class WineFridgeController:
                     "occupied": False
                 }
                 print(f"[DB] ✔ Emptied")
-
+            
         self.save_json('/home/plasticlab/WineFridge/RPI/database/inventory.json', self.inventory)
-
+        
         self.client.publish("winefridge/system/status", json.dumps({
             "action": "inventory_updated",
             "source": "mqtt_handler",
@@ -1708,18 +1703,18 @@ class WineFridgeController:
         if op_id in self.pending_operations:
             op = self.pending_operations[op_id]
             op['timer'].cancel()
-
+            
             if op['type'] == 'load':
                 self.update_inventory(
-                    op['drawer'],
-                    op['position'],
-                    op['barcode'],
+                    op['drawer'], 
+                    op['position'], 
+                    op['barcode'], 
                     op['name'],
                     MIN_FULL_BOTTLE_WEIGHT
                 )
-
+            
             del self.pending_operations[op_id]
-
+        
     def run(self):
         try:
             print("[MQTT] Starting MQTT loop...")
