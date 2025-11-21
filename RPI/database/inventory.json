@@ -111,10 +111,20 @@
       "mode": "rose",
       "positions": {
         "1": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8414825339511",
+          "name": "Alma Atl\u00e1ntica Ros\u00e9",
+          "weight": 555.2,
+          "percentage": 63,
+          "last_update": "2025-11-21T11:36:12.418527"
         },
         "2": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8411543125013",
+          "name": "Vi\u00f1a Pomal Rosado",
+          "weight": 184.5,
+          "percentage": 0,
+          "last_update": "2025-11-21T11:37:04.193168"
         },
         "3": {
           "occupied": false
@@ -196,10 +206,20 @@
       "mode": "white",
       "positions": {
         "1": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8414219000737",
+          "name": "CUATRO RAYAS Pampano Organic Afrutado Verdejo",
+          "weight": 1348.5,
+          "percentage": 100,
+          "last_update": "2025-11-21T11:57:12.846079"
         },
         "2": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "B08KSSB4D2",
+          "name": "Se\u00f1or\u00edo de los Llanos Verdejo",
+          "weight": 1187.2,
+          "percentage": 100,
+          "last_update": "2025-11-21T11:57:03.369311"
         },
         "3": {
           "occupied": false
@@ -281,7 +301,12 @@
       "mode": "red",
       "positions": {
         "1": {
-          "occupied": false
+          "occupied": true,
+          "barcode": "8410310604249",
+          "name": "Finca del Mar Cabernet Sauvignon Crianza",
+          "weight": 1242.2,
+          "percentage": 100,
+          "last_update": "2025-11-21T11:35:28.235004"
         },
         "2": {
           "occupied": false
