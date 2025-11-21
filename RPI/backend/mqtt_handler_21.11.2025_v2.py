@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 WineFridge MQTT Handler
-Version: 3.3.3
+Version: 3.3.2
 Date: 21.11.2025
 
 FIXES:
@@ -14,9 +14,6 @@ FIXES:
    y usa la escala de brillo 0-100.
 9. FIXED: Corrected middle zone routing - drawer 5 is functional and needs
    direct command, drawer 4 is controlled by lighting_6.
-10. FIXED: Added delayed LED sync on startup to prevent green blinking LEDs.
-    System now waits 3 seconds after MQTT connect, turns off all LEDs first,
-    then sets gray LEDs for occupied positions.
 """
 
 import json
@@ -59,7 +56,7 @@ def find_serial_port():
 
 class WineFridgeController:
     def __init__(self):
-        print("[INIT] Wine Fridge Controller v3.3.3")
+        print("[INIT] Wine Fridge Controller v3.3.2")
 
         # Load databases
         self.inventory = self.load_json('/home/plasticlab/WineFridge/RPI/database/inventory.json')
@@ -242,32 +239,13 @@ class WineFridgeController:
         client.subscribe("winefridge/system/status")
         print("[MQTT] ✔ Subscribed to topics")
 
-        # Wait for ESP32s to connect and settle before syncing LEDs
-        def delayed_sync():
-            time.sleep(3)  # Wait 3 seconds for ESP32s to be ready
-            self.sync_leds_with_inventory()
-        
-        threading.Thread(target=delayed_sync, daemon=True).start()
+        # Sync LEDs with current inventory state
+        self.sync_leds_with_inventory()
 
     def sync_leds_with_inventory(self):
         """Synchronize drawer LEDs with current inventory state on startup"""
         print("[SYNC] Synchronizing LEDs with inventory...")
 
-        # First, turn off ALL LEDs in all functional drawers to clear any blinking
-        print("[SYNC] Step 1: Turning off all LEDs...")
-        for drawer_id in FUNCTIONAL_DRAWERS:
-            self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
-                "action": "set_leds",
-                "source": "mqtt_handler",
-                "data": {"positions": []},
-                "timestamp": datetime.now().isoformat()
-            }))
-        
-        # Wait for LEDs to clear
-        time.sleep(1)
-        
-        # Now set gray LEDs for occupied positions
-        print("[SYNC] Step 2: Setting gray LEDs for occupied positions...")
         for drawer_id in FUNCTIONAL_DRAWERS:
             if drawer_id in self.inventory.get("drawers", {}):
                 positions_data = self.inventory["drawers"][drawer_id].get("positions", {})
@@ -292,6 +270,13 @@ class WineFridgeController:
                     }))
                     print(f"[SYNC] → {drawer_id}: {len(led_positions)} occupied positions")
                 else:
+                    # Turn off all LEDs if drawer is empty
+                    self.client.publish(f"winefridge/{drawer_id}/command", json.dumps({
+                        "action": "set_leds",
+                        "source": "mqtt_handler",
+                        "data": {"positions": []},
+                        "timestamp": datetime.now().isoformat()
+                    }))
                     print(f"[SYNC] → {drawer_id}: empty")
 
         print("[SYNC] ✔ LED synchronization complete\n")
